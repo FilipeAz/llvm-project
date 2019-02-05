@@ -729,6 +729,11 @@ struct FunCloner {
         Dst = LLVMBuildInsertValue(Builder, Agg, V, I, Name);
         break;
       }
+      case LLVMFreeze: {
+        LLVMValueRef Arg = CloneValue(LLVMGetOperand(Src, 0));
+        Dst = LLVMBuildFreeze(Builder, Arg, Name);
+        break;
+      }
       default:
         break;
     }
