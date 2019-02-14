@@ -597,7 +597,7 @@ namespace llvm {
     int ParseExtractValue(Instruction *&Inst, PerFunctionState &PFS);
     int ParseInsertValue(Instruction *&Inst, PerFunctionState &PFS);
 	
-	bool ParseFreeze(Instruction *&I, PerFunctionState &PFS);
+	bool ParseFreeze(Instruction *&Inst, PerFunctionState &PFS);
 
     // Use-list order directives.
     bool ParseUseListOrder(PerFunctionState *PFS = nullptr);
