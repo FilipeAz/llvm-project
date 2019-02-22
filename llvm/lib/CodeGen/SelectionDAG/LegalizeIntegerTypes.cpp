@@ -1104,8 +1104,6 @@ bool DAGTypeLegalizer::PromoteIntegerOperand(SDNode *N, unsigned OpNo) {
   case ISD::SMULFIX: Res = PromoteIntOp_SMULFIX(N); break;
 
   case ISD::FPOWI: Res = PromoteIntOp_FPOWI(N); break;
-  
-  case ISD::FREEZE: Res = PromoteIntOp_FREEZE(N); break;
   }
 
   // If the result is null, the sub-method took care of registering results etc.
