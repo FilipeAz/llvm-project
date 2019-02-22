@@ -894,6 +894,37 @@ unsigned UndefValue::getNumElements() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                         PoisonValue Implementation
+//===----------------------------------------------------------------------===//
+/*
+PoisonValue *PoisonValue::getSequentialElement() const {
+  return PoisonValue::get(getType()->getSequentialElementType());
+}
+
+PoisonValue *PoisonValue::getStructElement(unsigned Elt) const {
+  return PoisonValue::get(getType()->getStructElementType(Elt));
+}
+
+PoisonValue *PoisonValue::getElementValue(Constant *C) const {
+  if (isa<SequentialType>(getType()))
+    return getSequentialElement();
+  return getStructElement(cast<ConstantInt>(C)->getZExtValue());
+}
+
+PoisonValue *PoisonValue::getElementValue(unsigned Idx) const {
+  if (isa<SequentialType>(getType()))
+    return getSequentialElement();
+  return getStructElement(Idx);
+}
+
+unsigned PoisonValue::getNumElements() const {
+  Type *Ty = getType();
+  if (auto *ST = dyn_cast<SequentialType>(Ty))
+    return ST->getNumElements();
+  return Ty->getStructNumElements();
+}
+*/
+//===----------------------------------------------------------------------===//
 //                            ConstantXXX Classes
 //===----------------------------------------------------------------------===//
 
@@ -1424,6 +1455,23 @@ void UndefValue::destroyConstantImpl() {
   // Free the constant and any dangling references to it.
   getContext().pImpl->UVConstants.erase(getType());
 }
+
+/// Poison value's implementation of get and destroyer
+
+PoisonValue *PoisonValue::get(Type *Ty) {
+  std::unique_ptr<PoisonValue> &Entry = Ty->getContext().pImpl->PVConstants[Ty];
+  if (!Entry)
+    Entry.reset(new PoisonValue(Ty));
+  return Entry.get();
+}
+
+/// Remove the constant from the constant table.
+void PoisonValue::destroyConstantImpl() {
+  // Free the constant and any dangling references to it.
+  getContext().pImpl->PVConstants.erase(getType());
+}
+
+/// end
 
 BlockAddress *BlockAddress::get(BasicBlock *BB) {
   assert(BB->getParent() && "Block must have a parent");

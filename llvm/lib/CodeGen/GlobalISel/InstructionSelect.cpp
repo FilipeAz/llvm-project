@@ -64,7 +64,7 @@ bool InstructionSelect::runOnMachineFunction(MachineFunction &MF) {
   if (MF.getProperties().hasProperty(
           MachineFunctionProperties::Property::FailedISel))
     return false;
-
+  
   LLVM_DEBUG(dbgs() << "Selecting function: " << MF.getName() << '\n');
 
   const TargetPassConfig &TPC = getAnalysis<TargetPassConfig>();

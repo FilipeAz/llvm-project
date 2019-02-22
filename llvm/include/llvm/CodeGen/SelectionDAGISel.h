@@ -308,6 +308,7 @@ private:
   void Select_UNDEF(SDNode *N);
   void CannotYetSelect(SDNode *N);
 
+  void Select_POISON(SDNode *N);
   void Select_FREEZE(SDNode *N);
 
 private:

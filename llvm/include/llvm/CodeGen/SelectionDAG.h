@@ -851,6 +851,11 @@ public:
   SDValue getUNDEF(EVT VT) {
     return getNode(ISD::UNDEF, SDLoc(), VT);
   }
+  
+  // Return a POISON node.
+  SDValue getPOISON(EVT VT) {
+    return getNode(ISD::POISON, SDLoc(), VT);
+  }
 
   /// Return a GLOBAL_OFFSET_TABLE node. This does not have a useful SDLoc.
   SDValue getGLOBAL_OFFSET_TABLE(EVT VT) {

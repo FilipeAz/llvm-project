@@ -1319,6 +1319,53 @@ public:
   }
 };
 
+//===----------------------------------------------------------------------===//
+/// 'poison' values are similar to 'undef' values except they also taint the 
+/// data-flow graph with more 'poison' values.
+///
+/// These are used to represent Undefined Behavior and allow optimizations
+/// not possible with 'undef'.  
+///
+/// I might need to Rewrite this class a lot
+///
+class PoisonValue final : public ConstantData {
+  friend class Constant;
+
+  explicit PoisonValue(Type *T) : ConstantData(T, PoisonValueVal) {}
+	
+  void destroyConstantImpl();
+
+public:
+  PoisonValue(const PoisonValue &) = delete;
+
+  /// Static factory methods - Return an 'poison' object of the specified type.
+  static PoisonValue *get(Type *T);
+/*I'm not sure if these methods are needed.
+  /// If this Poison has array or vector type, return a Poison with the right
+  /// element type.
+  PoisonValue *getSequentialElement() const;
+
+  /// If this poison has struct type, return a poison with the right element type
+  /// for the specified element.
+  PoisonValue *getStructElement(unsigned Elt) const;
+
+  /// Return an poison of the right value for the specified GEP index if we can,
+  /// otherwise return null (e.g. if C is a ConstantExpr).
+  PoisonValue *getElementValue(Constant *C) const;
+
+  /// Return an poison of the right value for the specified GEP index.
+  PoisonValue *getElementValue(unsigned Idx) const;
+
+  /// Return the number of elements in the array, vector, or struct.
+  unsigned getNumElements() const;
+
+  /// Methods for support type inquiry through isa, cast, and dyn_cast:
+  static bool classof(const Value *V) {
+    return V->getValueID() == PoisonValueVal;
+  }
+*/
+};
+
 } // end namespace llvm
 
 #endif // LLVM_IR_CONSTANTS_H

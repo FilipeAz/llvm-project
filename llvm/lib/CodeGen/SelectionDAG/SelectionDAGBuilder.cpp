@@ -1205,6 +1205,7 @@ SDValue SelectionDAGBuilder::getValue(const Value *V) {
   // If we already have an SDValue for this value, use it. It's important
   // to do this first, so that we don't create a CopyFromReg if we already
   // have a regular SDValue.
+  
   SDValue &N = NodeMap[V];
   if (N.getNode()) return N;
 
@@ -1274,6 +1275,9 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
 
     if (isa<UndefValue>(C) && !V->getType()->isAggregateType())
       return DAG.getUNDEF(VT);
+  
+    if (isa<PoisonValue>(C) && !V->getType()->isAggregateType())
+	  return DAG.getPOISON(VT);
 
     if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(C)) {
       visit(CE->getOpcode(), *CE);
@@ -1328,6 +1332,8 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
         EVT EltVT = ValueVTs[i];
         if (isa<UndefValue>(C))
           Constants[i] = DAG.getUNDEF(EltVT);
+	    /*else if (isa<PoisonValue>(C))
+          Constants[i] = DAG.getPOISON(EltVT);*/
         else if (EltVT.isFloatingPoint())
           Constants[i] = DAG.getConstantFP(0, getCurSDLoc(), EltVT);
         else
@@ -2844,6 +2850,7 @@ void SelectionDAGBuilder::visitUnary(const User &I, unsigned Opcode) {
 
 void SelectionDAGBuilder::visitBinary(const User &I, unsigned Opcode) {
   SDNodeFlags Flags;
+  
   if (auto *OFBinOp = dyn_cast<OverflowingBinaryOperator>(&I)) {
     Flags.setNoSignedWrap(OFBinOp->hasNoSignedWrap());
     Flags.setNoUnsignedWrap(OFBinOp->hasNoUnsignedWrap());
@@ -2855,7 +2862,7 @@ void SelectionDAGBuilder::visitBinary(const User &I, unsigned Opcode) {
     Flags.setVectorReduction(true);
     LLVM_DEBUG(dbgs() << "Detected a reduction operation:" << I << "\n");
   }
-
+  
   SDValue Op1 = getValue(I.getOperand(0));
   SDValue Op2 = getValue(I.getOperand(1));
   SDValue BinNodeValue = DAG.getNode(Opcode, getCurSDLoc(), Op1.getValueType(),

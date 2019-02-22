@@ -88,6 +88,7 @@ void DAGTypeLegalizer::PromoteIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::SRL:         Res = PromoteIntRes_SRL(N); break;
   case ISD::TRUNCATE:    Res = PromoteIntRes_TRUNCATE(N); break;
   case ISD::UNDEF:       Res = PromoteIntRes_UNDEF(N); break;
+  //case ISD::POISON:		 Res = PromoteIntRes_POISON(N); break;
   case ISD::VAARG:       Res = PromoteIntRes_VAARG(N); break;
 
   case ISD::EXTRACT_SUBVECTOR:
@@ -982,6 +983,11 @@ SDValue DAGTypeLegalizer::PromoteIntRes_UNDEF(SDNode *N) {
                                                N->getValueType(0)));
 }
 
+/*SDValue DAGTypeLegalizer::PromoteIntRes_POISON(SDNode *N) {
+  return DAG.getPOISON(TLI.getTypeToTransformTo(*DAG.getContext(),
+                                               N->getValueType(0)));
+}*/
+
 SDValue DAGTypeLegalizer::PromoteIntRes_VAARG(SDNode *N) {
   SDValue Chain = N->getOperand(0); // Get the chain.
   SDValue Ptr = N->getOperand(1); // Get the pointer.
@@ -1523,6 +1529,7 @@ void DAGTypeLegalizer::ExpandIntegerResult(SDNode *N, unsigned ResNo) {
   case ISD::SELECT:       SplitRes_SELECT(N, Lo, Hi); break;
   case ISD::SELECT_CC:    SplitRes_SELECT_CC(N, Lo, Hi); break;
   case ISD::UNDEF:        SplitRes_UNDEF(N, Lo, Hi); break;
+  //case ISD::POISON:		  SplitRes_POISON(N, Lo, Hi); break;
   case ISD::FREEZE:       SplitRes_FREEZE(N, Lo, Hi); break;
 
   case ISD::BITCAST:            ExpandRes_BITCAST(N, Lo, Hi); break;

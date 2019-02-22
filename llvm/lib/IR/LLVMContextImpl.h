@@ -1276,6 +1276,8 @@ public:
   DenseMap<PointerType *, std::unique_ptr<ConstantPointerNull>> CPNConstants;
 
   DenseMap<Type *, std::unique_ptr<UndefValue>> UVConstants;
+  
+  DenseMap<Type *, std::unique_ptr<PoisonValue>> PVConstants;
 
   StringMap<ConstantDataSequential*> CDSConstants;
 
