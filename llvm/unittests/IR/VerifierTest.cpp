@@ -46,11 +46,10 @@ TEST(VerifierTest, Branch_i1) {
 }
 
 TEST(VerifierTest, Freeze) {
-  /*LLVMContext C;
+  LLVMContext C;
   Module M("M", C);
-  FunctionType *FTy = FunctionType::get(Type::getVoidTy(C), /*isVarArg=COMENTARISTOfalse);
->>>>>>> 0165e46... New version with patches of Freeze implemented that only fail 7 tests
-  Function *F = cast<Function>(M.getOrInsertFunction("foo", FTy));
+  FunctionType *FTy = FunctionType::get(Type::getVoidTy(C), /*isVarArg=*/false);
+  Function *F = cast<Function>(M.getOrInsertFunction("foo", FTy).getCallee());
   BasicBlock *Entry = BasicBlock::Create(C, "entry", F);
   ReturnInst *RI = ReturnInst::Create(C, Entry);
 
@@ -91,7 +90,7 @@ TEST(VerifierTest, Freeze) {
 
   EXPECT_FALSE(verifyFunction(*F));
 
-  FI_ptr->eraseFromParent();*/
+  FI_ptr->eraseFromParent();
 }
 
 TEST(VerifierTest, InvalidRetAttribute) {

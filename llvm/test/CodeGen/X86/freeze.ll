@@ -6,8 +6,8 @@
 ; X86ASM: retq
 
 ; MCINSTR: %1:gr32 = IMPLICIT_DEF
-; MCINSTR: %2:gr32 = IMUL32rr %1:gr32, %1:gr32,
-; MCINSTR: %3:gr32 = XOR32rr %2:gr32, %1:gr32,
+; MCINSTR: %2:gr32 = IMUL32rr %1:gr32(tied-def 0), %1:gr32,
+; MCINSTR: %3:gr32 = XOR32rr %2:gr32(tied-def 0), %1:gr32,
 ; MCINSTR: $eax = COPY %3:gr32
 ; MCINSTR: RET 0, $eax
 
