@@ -1543,7 +1543,7 @@ LLVMTypeRef LLVMX86MMXType(void);
           macro(Function)                   \
           macro(GlobalVariable)             \
       macro(UndefValue)                     \
-	 /* macro(PoisonValue)*/				\
+   /* macro(PoisonValue)*/                  \
     macro(Instruction)                      \
       macro(BinaryOperator)                 \
       macro(CallInst)                       \

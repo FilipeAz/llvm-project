@@ -49,7 +49,7 @@ namespace llvm {
       t_LocalID, t_GlobalID,           			 // ID in UIntVal.
       t_LocalName, t_GlobalName,       			 // Name in StrVal.
       t_APSInt, t_APFloat,             			 // Value in APSIntVal/APFloatVal.
-      t_Null, t_Undef, t_Poison, t_Zero, t_None, // No value.
+      t_Null, t_Undef, t_Poison, t_Zero, t_None,         // No value.
       t_EmptyArray,                    		 	 // No value:  []
       t_Constant,                      			 // Value in ConstantVal.
       t_InlineAsm,                     			 // Value in FTy/StrVal/StrVal2/UIntVal.

@@ -1205,7 +1205,6 @@ SDValue SelectionDAGBuilder::getValue(const Value *V) {
   // If we already have an SDValue for this value, use it. It's important
   // to do this first, so that we don't create a CopyFromReg if we already
   // have a regular SDValue.
-  
   SDValue &N = NodeMap[V];
   if (N.getNode()) return N;
 
@@ -1332,7 +1331,7 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
         EVT EltVT = ValueVTs[i];
         if (isa<UndefValue>(C))
           Constants[i] = DAG.getUNDEF(EltVT);
-	    /*else if (isa<PoisonValue>(C))
+	/*else if (isa<PoisonValue>(C))
           Constants[i] = DAG.getPOISON(EltVT);*/
         else if (EltVT.isFloatingPoint())
           Constants[i] = DAG.getConstantFP(0, getCurSDLoc(), EltVT);
@@ -2850,7 +2849,6 @@ void SelectionDAGBuilder::visitUnary(const User &I, unsigned Opcode) {
 
 void SelectionDAGBuilder::visitBinary(const User &I, unsigned Opcode) {
   SDNodeFlags Flags;
-  
   if (auto *OFBinOp = dyn_cast<OverflowingBinaryOperator>(&I)) {
     Flags.setNoSignedWrap(OFBinOp->hasNoSignedWrap());
     Flags.setNoUnsignedWrap(OFBinOp->hasNoUnsignedWrap());

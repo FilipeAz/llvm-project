@@ -176,8 +176,8 @@ namespace ISD {
     /// UNDEF - An undefined node.
     UNDEF,
 	
-	/// POISON - A poison node, meaning that any operation with a node of this 
-	/// type returns another poison node, except Freeze, Phi and Select.
+    /// POISON - A poison node, meaning that any operation with a node of this 
+    /// type returns another poison node, except Freeze, Phi and Select.
     POISON,
 
     // FREEZE - FREEZE(VAL) returns an arbitrary integer if VAL is UNDEF (or

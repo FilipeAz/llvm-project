@@ -1358,12 +1358,12 @@ public:
 
   /// Return the number of elements in the array, vector, or struct.
   unsigned getNumElements() const;
-
+*/
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Value *V) {
     return V->getValueID() == PoisonValueVal;
   }
-*/
+
 };
 
 } // end namespace llvm
