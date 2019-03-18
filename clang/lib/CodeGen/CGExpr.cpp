@@ -2060,9 +2060,16 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
   // and mask together with source before storing.
   /*if (Info.StorageSize != Info.Size) {
     assert(Info.StorageSize > Info.Size && "Invalid bitfield size.");
-    llvm::Value *Val =
+	
+	Ptr.getPointer()->mutateType(llvm::PointerType::get(llvm::VectorType::get(llvm::IntegerType::get(Ptr.getElementType()->getContext(), 1),
+	  Ptr.getElementType()->getPrimitiveSizeInBits()), Ptr.getAddressSpace())); 
+	  
+	
+	
+	llvm::Value *Val =\
       Builder.CreateLoad(Ptr, Dst.isVolatileQualified(), "bf.load");
-
+	
+	
     // Mask the source value as needed.
     if (!hasBooleanRepresentation(Dst.getType()))
       SrcVal = Builder.CreateAnd(SrcVal,
@@ -2070,10 +2077,10 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
                                                             Info.Size),
                                  "bf.value");
     MaskedVal = SrcVal;
+	
+	
     if (Info.Offset)
       SrcVal = Builder.CreateShl(SrcVal, Info.Offset, "bf.shl");
-
-  
 	
     // Mask out the original value.
     Val = Builder.CreateAnd(Val,
