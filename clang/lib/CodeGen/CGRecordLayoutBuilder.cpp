@@ -26,6 +26,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+
 using namespace clang;
 using namespace CodeGen;
 
@@ -719,6 +720,11 @@ CGBitFieldInfo CGBitFieldInfo::MakeInfo(CodeGenTypes &Types,
   return CGBitFieldInfo(Offset, Size, IsSigned, StorageSize, StorageOffset);
 }
 
+// GCD calculating function
+int gcd(int a, int b) {
+  return b == 0 ? a : gcd(b, a % b);
+}
+
 CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
                                                   llvm::StructType *Ty) {
   CGRecordLowering Builder(*this, D, /*Packed=*/false);
@@ -741,11 +747,60 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
              "Non-virtual and complete types must agree on packedness");
     }
   }
+  
+  
+  // First we need to find out how many bits are actually needed (padding and everything) 
+  // to safely store this struct
+  
+  unsigned int numStorageSize = 0;
+  
+  size_t typeSize = Builder.FieldTypes.size();
+  
+  for(unsigned int typeIter = 0; typeIter != typeSize; typeIter++) {
+	
+	if(Builder.FieldTypes[typeIter]->getTypeID() == 14) {
+	  numStorageSize += (Builder.FieldTypes[typeIter]->getArrayElementType()->getPrimitiveSizeInBits() * Builder.FieldTypes[typeIter]->getArrayNumElements());
+	}
+	else {
+	  numStorageSize += Builder.FieldTypes[typeIter]->getPrimitiveSizeInBits();
+	}
+  }
+  
+  // Vector to where the new bitfield sizes (according to the GCD) will be stored
+  SmallVector<llvm::Type *, 16> newFields;
+  
+  llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::iterator i = Builder.BitFields.begin();
+  llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::iterator e = Builder.BitFields.end();
+  
+  int GCD = i->second.Size;
+  int neededBits = GCD;
+  i->second.Offset = 0;
+  i++;
+  
+  // Iterate over each bitfield of the given struct and resolve their greatest common divisor (GCD)
+  for(; i != e; i++) {
+	i->second.Offset = neededBits;
+	GCD = gcd(GCD, i->second.Size);
+	neededBits += i->second.Size;
+  }
+  
+  for(i = Builder.BitFields.begin(); i != e; i++) {
+	i->second.GCD = GCD;
+	i->second.NeededBits = neededBits;
+  }
+  
+  newFields.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), GCD), neededBits/GCD));
+  
+  // If the space we need to actually allocate is not a multiple of 8, create a padding integer here 
+  int remainder = numStorageSize - neededBits;
+  if(remainder != 0)
+	newFields.push_back(llvm::IntegerType::get(Ty->getContext(), remainder));
 
+  
   // Fill in the struct *after* computing the base type.  Filling in the body
   // signifies that the type is no longer opaque and record layout is complete,
   // but we may need to recursively layout D while laying D out as a base type.
-  Ty->setBody(Builder.FieldTypes, Builder.Packed);
+  Ty->setBody(/*Builder.FieldTypes*/newFields, /*Builder.Packed*/ false);
 
   CGRecordLayout *RL =
     new CGRecordLayout(Ty, BaseTy, Builder.IsZeroInitializable,
