@@ -1820,7 +1820,7 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   Address Ptr = LV.getBitFieldAddress();
  
   // This should now return an array
-  llvm::Value *bitFieldArray = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
+  llvm::Value *bitFieldVector = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
   /*unsigned int arr[2] = {2,3};
   Val = Builder.CreateExtractValue(Val, llvm::makeArrayRef<unsigned>(arr));
   if (Info.IsSigned) {
@@ -1841,7 +1841,7 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   int index = Info.Offset/Info.GCD;
   int indexEnd = Info.Size/Info.GCD + index;
   
-  llvm::Value *Val = Builder.CreateExtractValue(bitFieldArray, index);
+  llvm::Value *Val = Builder.CreateExtractElement(bitFieldVector, index);
   if(Info.IsSigned)
     Val = Builder.CreateSExt(Val, ResLTy);
   else 
@@ -1850,11 +1850,8 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   index++;
   
   for (; index < indexEnd; index++) {
-	Val = Builder.CreateExtractValue(bitFieldArray, index);
-	if(Info.IsSigned)
-      Val = Builder.CreateSExt(Val, ResLTy);
-    else 
-	  Val = Builder.CreateZExt(Val, ResLTy);
+	Val = Builder.CreateExtractElement(bitFieldVector, index);
+	Val = Builder.CreateZExt(Val, ResLTy);
 	Val = Builder.CreateShl(Val, (indexEnd - index - 1)*Info.GCD);
 	ResVal = Builder.CreateOr(Val, ResVal);
   }
@@ -2097,6 +2094,11 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
   
   llvm::Value *Val =
       Builder.CreateLoad(Ptr, Dst.isVolatileQualified(), "bf.load");
+  /*SrcVal = Builder.CreateTrunc(SrcVal, llvm::IntegerType::get(ResLTy->getContext(), Info.Size));
+  llvm::Value *ArrayVal = Builder.CreateBitCast(SrcVal, llvm::ArrayType::get(llvm::IntegerType::get(ResLTy->getContext(), Info.Size), 1));
+  ArrayVal = Builder.CreateBitCast(ArrayVal, llvm::ArrayType::get(llvm::IntegerType::get(ResLTy->getContext(), Info.GCD), Info.Size/Info.GCD));
+  
+  Val = Builder.CreateInsertValue(Val, ArrayVal, {Info.Offset, Info.Offset+1, Info.Offset+2, Info.Offset+3, Info.Offset+4, Info.Offset+5});*/
   unsigned int bitMax = Info.Size;
   llvm::Value *AndVal;
   
@@ -2105,7 +2107,7 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
 	bitMax -= Info.GCD;
 	AndVal = Builder.CreateAShr(AndVal, (indexEnd-index-1)*Info.GCD);
 	AndVal = Builder.CreateTrunc(AndVal, llvm::IntegerType::get(ResLTy->getContext(), Info.GCD));
-	Val = Builder.CreateInsertValue(Val, AndVal, index);
+	Val = Builder.CreateInsertElement(Val, AndVal, index);
   }
   
 
@@ -3935,7 +3937,7 @@ LValue CodeGenFunction::EmitLValueForField(LValue base,
     //llvm::Type *FieldIntTy =\
       llvm::Type::getIntNTy(getLLVMContext(), Info.StorageSize);
 	  
-	llvm::Type *FieldIntTy = llvm::ArrayType::get(llvm::IntegerType::get(getLLVMContext(), bitFieldsGCD), bitFieldsNeededBits/bitFieldsGCD);
+	llvm::Type *FieldIntTy = llvm::VectorType::get(llvm::IntegerType::get(getLLVMContext(), bitFieldsGCD), bitFieldsNeededBits/bitFieldsGCD);
 	
 	if (Addr.getElementType() != FieldIntTy) {
 	  Addr = Builder.CreateElementBitCast(Addr, FieldIntTy);

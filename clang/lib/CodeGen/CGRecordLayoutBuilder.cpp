@@ -771,7 +771,6 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
   
   llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::iterator i = Builder.BitFields.begin();
   llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::iterator e = Builder.BitFields.end();
-  
   int GCD = i->second.Size;
   int neededBits = GCD;
   i->second.Offset = 0;
@@ -789,7 +788,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
 	i->second.NeededBits = neededBits;
   }
   
-  newFields.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), GCD), neededBits/GCD));
+  newFields.push_back(llvm::VectorType::get(llvm::IntegerType::get(Ty->getContext(), GCD), neededBits/GCD));
   
   // If the space we need to actually allocate is not a multiple of 8, create a padding integer here 
   int remainder = numStorageSize - neededBits;
