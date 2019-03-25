@@ -76,10 +76,6 @@ struct CGBitFieldInfo {
   /// The storage size in bits which should be used when accessing this
   /// bitfield.
   unsigned StorageSize;
-  
-  unsigned GCD;
-  
-  unsigned NeededBits;
 
   /// The offset of the bitfield storage from the start of the struct.
   CharUnits StorageOffset;

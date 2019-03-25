@@ -36,7 +36,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
-
+#include <iostream>
 #include <string>
 
 using namespace clang;
@@ -1818,12 +1818,14 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   llvm::Type *ResLTy = ConvertType(LV.getType());
   
   Address Ptr = LV.getBitFieldAddress();
- 
+  
   // This should now return an array
-  llvm::Value *bitFieldVector = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
+  llvm::Value *Val = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
   /*unsigned int arr[2] = {2,3};
-  Val = Builder.CreateExtractValue(Val, llvm::makeArrayRef<unsigned>(arr));
-  if (Info.IsSigned) {
+  Val = Builder.CreateExtractValue(Val, llvm::makeArrayRef<unsigned>(arr));*/
+  
+  // Original stuff
+  /*if (Info.IsSigned) {
     assert(static_cast<unsigned>(Info.Offset + Info.Size) <= Info.StorageSize);
     unsigned HighBits = Info.StorageSize - Info.Offset - Info.Size;
     if (HighBits)
@@ -1838,7 +1840,9 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
                                                               Info.Size),
                               "bf.clear");
   }*/
-  int index = Info.Offset/Info.GCD;
+  
+  // Stuff done by me
+  /*int index = Info.Offset/Info.GCD;
   int indexEnd = Info.Size/Info.GCD + index;
   
   llvm::Value *Val = Builder.CreateExtractElement(bitFieldVector, index);
@@ -1854,11 +1858,11 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
 	Val = Builder.CreateZExt(Val, ResLTy);
 	Val = Builder.CreateShl(Val, (indexEnd - index - 1)*Info.GCD);
 	ResVal = Builder.CreateOr(Val, ResVal);
-  }
+  }*/
   
-  Val = Builder.CreateIntCast(ResVal, ResLTy, Info.IsSigned, "bf.cast");
-  EmitScalarRangeCheck(ResVal, LV.getType(), Loc);
-  return RValue::get(ResVal);
+  Val = Builder.CreateIntCast(Val, ResLTy, Info.IsSigned, "bf.cast");
+  EmitScalarRangeCheck(Val, LV.getType(), Loc);
+  return RValue::get(Val);
 }
 
 // If this is a reference to a subset of the elements of a vector, create an
@@ -2046,7 +2050,7 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
   llvm::Value *SrcVal = Src.getScalarVal();
 	
   // Cast the source to the storage type and shift it into place.
-  //SrcVal = Builder.CreateIntCast(SrcVal, Ptr.getElementType(),\
+  SrcVal = Builder.CreateIntCast(SrcVal, Ptr.getElementType(),\
                                  /*IsSigned=*/false);
 								 
   //SrcVal = Builder.CreateIntCast(SrcVal, llvm::IntegerType::get(ResLTy->getContext(), Info.Size),\
@@ -2058,8 +2062,6 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
   /*if (Info.StorageSize != Info.Size) {
     assert(Info.StorageSize > Info.Size && "Invalid bitfield size.");
 	
-	Ptr.getPointer()->mutateType(llvm::PointerType::get(llvm::VectorType::get(llvm::IntegerType::get(Ptr.getElementType()->getContext(), 1),
-	  Ptr.getElementType()->getPrimitiveSizeInBits()), Ptr.getAddressSpace())); 
 	  
 	
 	
@@ -2092,14 +2094,14 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
     assert(Info.Offset == 0);
   }*/
   
-  llvm::Value *Val =
+  /*llvm::Value *Val =
       Builder.CreateLoad(Ptr, Dst.isVolatileQualified(), "bf.load");
   /*SrcVal = Builder.CreateTrunc(SrcVal, llvm::IntegerType::get(ResLTy->getContext(), Info.Size));
   llvm::Value *ArrayVal = Builder.CreateBitCast(SrcVal, llvm::ArrayType::get(llvm::IntegerType::get(ResLTy->getContext(), Info.Size), 1));
   ArrayVal = Builder.CreateBitCast(ArrayVal, llvm::ArrayType::get(llvm::IntegerType::get(ResLTy->getContext(), Info.GCD), Info.Size/Info.GCD));
   
   Val = Builder.CreateInsertValue(Val, ArrayVal, {Info.Offset, Info.Offset+1, Info.Offset+2, Info.Offset+3, Info.Offset+4, Info.Offset+5});*/
-  unsigned int bitMax = Info.Size;
+  /*unsigned int bitMax = Info.Size;
   llvm::Value *AndVal;
   
   for(int index = Info.Offset/Info.GCD, indexEnd = Info.Size/Info.GCD + index; index < indexEnd; index++){
@@ -2108,12 +2110,12 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
 	AndVal = Builder.CreateAShr(AndVal, (indexEnd-index-1)*Info.GCD);
 	AndVal = Builder.CreateTrunc(AndVal, llvm::IntegerType::get(ResLTy->getContext(), Info.GCD));
 	Val = Builder.CreateInsertElement(Val, AndVal, index);
-  }
+  }*/
   
 
   // Write the new value back out.
-  //Builder.CreateStore(SrcVal, Ptr, Dst.isVolatileQualified());
-  Builder.CreateStore(Val, Ptr, Dst.isVolatileQualified());
+  Builder.CreateStore(SrcVal, Ptr, Dst.isVolatileQualified());
+  //Builder.CreateStore(Val, Ptr, Dst.isVolatileQualified());
 
   // Return the new value of the bit-field, if requested.
   if (Result) {
@@ -3924,24 +3926,29 @@ LValue CodeGenFunction::EmitLValueForField(LValue base,
       CGM.getTypes().getCGRecordLayout(field->getParent());
     const CGBitFieldInfo &Info = RL.getBitFieldInfo(field);
     Address Addr = base.getAddress();
-	int bitFieldsGCD = Info.GCD;
-	int bitFieldsNeededBits = Info.NeededBits;
 	
+	// Original stuff
 	/*unsigned Idx = RL.getLLVMFieldNo(field);
-    if (Idx != 0){
+    if (Idx != 0){	
       // For structs, we GEP to the field that the record layout suggests.
       Addr = Builder.CreateStructGEP(Addr, Idx, Info.StorageOffset,
                                      field->getName());
 	}*/
+	
     // Get the access type.
-    //llvm::Type *FieldIntTy =\
+    /*llvm::Type *FieldIntTy =
       llvm::Type::getIntNTy(getLLVMContext(), Info.StorageSize);
 	  
-	llvm::Type *FieldIntTy = llvm::VectorType::get(llvm::IntegerType::get(getLLVMContext(), bitFieldsGCD), bitFieldsNeededBits/bitFieldsGCD);
+	//llvm::Type *FieldIntTy = llvm::VectorType::get(llvm::IntegerType::get(getLLVMContext(), bitFieldsGCD), bitFieldsNeededBits/bitFieldsGCD);
 	
 	if (Addr.getElementType() != FieldIntTy) {
 	  Addr = Builder.CreateElementBitCast(Addr, FieldIntTy);
-	}
+	}*/
+	
+	unsigned Idx = RL.getLLVMFieldNo(field);
+	
+	Addr = Builder.CreateStructGEP(Addr, Idx, Info.StorageOffset,
+                                     field->getName());
 	
     QualType fieldType =
       field->getType().withCVRQualifiers(base.getVRQualifiers());
