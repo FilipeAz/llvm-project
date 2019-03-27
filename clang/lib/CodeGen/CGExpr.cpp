@@ -36,7 +36,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
-#include <iostream>
+
 #include <string>
 
 using namespace clang;
@@ -1813,7 +1813,7 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
                                                  SourceLocation Loc) {
 	
   const CGBitFieldInfo &Info = LV.getBitFieldInfo();
-
+  
   // Get the output type.
   llvm::Type *ResLTy = ConvertType(LV.getType());
   
@@ -2042,7 +2042,9 @@ void CodeGenFunction::EmitStoreThroughLValue(RValue Src, LValue Dst,
 
 void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
                                                      llvm::Value **Result) {
+														 
   const CGBitFieldInfo &Info = Dst.getBitFieldInfo();
+  
   llvm::Type *ResLTy = ConvertTypeForMem(Dst.getType());
   Address Ptr = Dst.getBitFieldAddress();
 
