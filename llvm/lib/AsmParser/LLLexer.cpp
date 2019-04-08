@@ -240,6 +240,8 @@ lltok::Kind LLLexer::LexToken() {
     case ',': return lltok::comma;
     case '*': return lltok::star;
     case '|': return lltok::bar;
+    case '\\': return lltok::lslash;
+    case '/': return lltok::rslash;
     }
   }
 }

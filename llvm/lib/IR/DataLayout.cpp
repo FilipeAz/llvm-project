@@ -48,14 +48,17 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   StructSize = 0;
   IsPadded = false;
   NumElements = ST->getNumElements();
-
+  
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
     Type *Ty = ST->getElementType(i);
     unsigned TyAlign = ST->isPacked() ? 1 : DL.getABITypeAlignment(Ty);
-
+    
     // Add padding if necessary to align the data element properly.
-    if ((StructSize & (TyAlign-1)) != 0) {
+    if (ST->isReallyPacked()) {
+      IsPadded = true;
+    }
+    else if ((StructSize & (TyAlign-1)) != 0) {
       IsPadded = true;
       StructSize = alignTo(StructSize, TyAlign);
     }
@@ -63,8 +66,19 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
     // Keep track of maximum alignment constraint.
     StructAlignment = std::max(TyAlign, StructAlignment);
 
-    MemberOffsets[i] = StructSize;
-    StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
+    if(ST->isReallyPacked()) {
+      MemberOffsets[i] = StructSize;
+      if(Ty->getTypeID() == 14) {
+        StructSize += Ty->getArrayElementType()->getPrimitiveSizeInBits() * Ty->getArrayNumElements(); // Consume space for this data item
+      }
+      else {
+        StructSize += Ty->getPrimitiveSizeInBits(); // Consume space for this data item
+      }
+    }
+    else {
+      MemberOffsets[i] = StructSize;
+      StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
+    }
   }
 
   // Empty structures have alignment of 1 byte.
@@ -72,7 +86,10 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 
   // Add padding to the end of the struct so that it could be put in an array
   // and all array elements would be aligned correctly.
-  if ((StructSize & (StructAlignment-1)) != 0) {
+  if (ST->isReallyPacked()) {
+    StructSize /= 8;
+  }
+  else if ((StructSize & (StructAlignment-1)) != 0) {
     IsPadded = true;
     StructSize = alignTo(StructSize, StructAlignment);
   }

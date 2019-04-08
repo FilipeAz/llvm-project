@@ -36,6 +36,8 @@ enum Kind {
   exclaim, // !
   bar,     // |
   colon,   // :
+  lslash,
+  rslash, // \ /
 
   kw_x,
   kw_true,

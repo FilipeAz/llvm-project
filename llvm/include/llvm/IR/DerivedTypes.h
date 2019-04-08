@@ -237,7 +237,8 @@ class StructType : public CompositeType {
     SCDB_HasBody = 1,
     SCDB_Packed = 2,
     SCDB_IsLiteral = 4,
-    SCDB_IsSized = 8
+    SCDB_IsSized = 8,
+    SCDB_ReallyPacked = 16
   };
 
   /// For a named struct that actually has a name, this is a pointer to the
@@ -271,7 +272,7 @@ public:
 
   /// This static method is the primary way to create a literal StructType.
   static StructType *get(LLVMContext &Context, ArrayRef<Type*> Elements,
-                         bool isPacked = false);
+                         bool isPacked = false, bool isReallyPacked = false);
 
   /// Create an empty structure type.
   static StructType *get(LLVMContext &Context, bool isPacked = false);
@@ -290,6 +291,8 @@ public:
   }
 
   bool isPacked() const { return (getSubclassData() & SCDB_Packed) != 0; }
+
+  bool isReallyPacked() const { return (getSubclassData() & SCDB_ReallyPacked) != 0; }
 
   /// Return true if this type is uniqued by structural equivalence, false if it
   /// is a struct definition.
@@ -315,7 +318,7 @@ public:
   void setName(StringRef Name);
 
   /// Specify a body for an opaque identified type.
-  void setBody(ArrayRef<Type*> Elements, bool isPacked = false);
+  void setBody(ArrayRef<Type*> Elements, bool isPacked = false, bool isReallyPacked = false);
 
   template <typename... Tys>
   typename std::enable_if<are_base_of<Type, Tys...>::value, void>::type

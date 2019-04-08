@@ -635,9 +635,11 @@ void TypePrinting::printStructBody(StructType *STy, raw_ostream &OS) {
     return;
   }
 
-  if (STy->isPacked())
+  if (STy->isReallyPacked())
+    OS << '\\';
+  else if (STy->isPacked())
     OS << '<';
-
+    
   if (STy->getNumElements() == 0) {
     OS << "{}";
   } else {
@@ -651,7 +653,10 @@ void TypePrinting::printStructBody(StructType *STy, raw_ostream &OS) {
 
     OS << " }";
   }
-  if (STy->isPacked())
+
+  if (STy->isReallyPacked())
+    OS << '/';
+  else if (STy->isPacked())
     OS << '>';
 }
 
@@ -1434,7 +1439,9 @@ static void WriteConstantInternal(raw_ostream &Out, const Constant *CV,
   }
 
   if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
-    if (CS->getType()->isPacked())
+    if (CS->getType()->isReallyPacked())
+      Out << '\\';
+    else if (CS->getType()->isPacked())
       Out << '<';
     Out << '{';
     unsigned N = CS->getNumOperands();
@@ -1458,7 +1465,9 @@ static void WriteConstantInternal(raw_ostream &Out, const Constant *CV,
     }
 
     Out << '}';
-    if (CS->getType()->isPacked())
+    if (CS->getType()->isReallyPacked())
+      Out << '/';
+    else if (CS->getType()->isPacked())
       Out << '>';
     return;
   }

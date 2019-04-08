@@ -54,7 +54,8 @@ namespace llvm {
       t_Constant,                      			 // Value in ConstantVal.
       t_InlineAsm,                     			 // Value in FTy/StrVal/StrVal2/UIntVal.
       t_ConstantStruct,                			 // Value in ConstantStructElts.
-      t_PackedConstantStruct           			 // Value in ConstantStructElts.
+      t_PackedConstantStruct,           		 // Value in ConstantStructElts.
+      t_ReallyPackedConstantStruct           // Value in ConstanteStructElts.
     } Kind = t_LocalID;
 
     LLLexer::LocTy Loc;
@@ -397,7 +398,7 @@ namespace llvm {
       Loc = Lex.getLoc();
       return ParseType(Result, AllowVoid);
     }
-    bool ParseAnonStructType(Type *&Result, bool Packed);
+    bool ParseAnonStructType(Type *&Result, bool Packed, bool ReallyPacked = false);
     bool ParseStructBody(SmallVectorImpl<Type*> &Body);
     bool ParseStructDefinition(SMLoc TypeLoc, StringRef Name,
                                std::pair<Type*, LocTy> &Entry,

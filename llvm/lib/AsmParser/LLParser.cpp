@@ -2254,7 +2254,7 @@ bool LLParser::ParseIndexList(SmallVectorImpl<unsigned> &Indices,
 bool LLParser::ParseType(Type *&Result, const Twine &Msg, bool AllowVoid) {
   SMLoc TypeLoc = Lex.getLoc();
   switch (Lex.getKind()) {
-  default:
+  default: 
     return TokError(Msg);
   case lltok::Type:
     // Type ::= 'float' | 'void' (etc)
@@ -2281,6 +2281,15 @@ bool LLParser::ParseType(Type *&Result, const Twine &Msg, bool AllowVoid) {
         return true;
     } else if (ParseArrayVectorType(Result, true))
       return true;
+    break;
+  case lltok::lslash: // Really packed struct.
+    // Type ::= '\' ... '/'
+    Lex.Lex();
+    if (Lex.getKind() == lltok::lbrace) {
+      if (ParseAnonStructType(Result, false, true) ||
+          ParseToken(lltok::rslash, "expected '/' at end of packed struct"))
+        return true;
+    } 
     break;
   case lltok::LocalVar: {
     // Type ::= %foo
@@ -2579,11 +2588,11 @@ bool LLParser::ParseFunctionType(Type *&Result) {
 
 /// ParseAnonStructType - Parse an anonymous struct type, which is inlined into
 /// other structs.
-bool LLParser::ParseAnonStructType(Type *&Result, bool Packed) {
+bool LLParser::ParseAnonStructType(Type *&Result, bool Packed, bool ReallyPacked) {
   SmallVector<Type*, 8> Elts;
   if (ParseStructBody(Elts)) return true;
 
-  Result = StructType::get(Context, Elts, Packed);
+  Result = StructType::get(Context, Elts, Packed, ReallyPacked);
   return false;
 }
 
@@ -2611,6 +2620,9 @@ bool LLParser::ParseStructDefinition(SMLoc TypeLoc, StringRef Name,
   // If the type starts with '<', then it is either a packed struct or a vector.
   bool isPacked = EatIfPresent(lltok::less);
 
+  // If the type starts with '\', then it is a really packed struct.
+  bool isReallyPacked = EatIfPresent(lltok::lslash);
+
   // If we don't have a struct, then we have a random type alias, which we
   // accept for compatibility with old files.  These types are not allowed to be
   // forward referenced and not allowed to be recursive.
@@ -2635,10 +2647,11 @@ bool LLParser::ParseStructDefinition(SMLoc TypeLoc, StringRef Name,
 
   SmallVector<Type*, 8> Body;
   if (ParseStructBody(Body) ||
-      (isPacked && ParseToken(lltok::greater, "expected '>' in packed struct")))
+      (isPacked && ParseToken(lltok::greater, "expected '>' in packed struct")) ||
+      (isReallyPacked && ParseToken(lltok::rslash, "expected '/' in really packed struct")))
     return true;
 
-  STy->setBody(Body, isPacked);
+  STy->setBody(Body, isPacked, isReallyPacked);
   ResultTy = STy;
   return false;
 }
@@ -2998,7 +3011,6 @@ bool LLParser::ParseValID(ValID &ID, PerFunctionState *PFS) {
     if (ParseGlobalValueVector(Elts) ||
         ParseToken(lltok::rbrace, "expected end of struct constant"))
       return true;
-
     ID.ConstantStructElts = make_unique<Constant *[]>(Elts.size());
     ID.UIntVal = Elts.size();
     memcpy(ID.ConstantStructElts.get(), Elts.data(),
@@ -3047,6 +3059,29 @@ bool LLParser::ParseValID(ValID &ID, PerFunctionState *PFS) {
 
     ID.ConstantVal = ConstantVector::get(Elts);
     ID.Kind = ValID::t_Constant;
+    return false;
+  }
+  case lltok::lslash: {
+    // ValID ::= '\' '{' ConstVector '}' '/' --> Really Packed Struct.
+    Lex.Lex();
+    bool isReallyPackedStruct = EatIfPresent(lltok::lbrace);
+
+    SmallVector<Constant*, 16> Elts;
+    if (ParseGlobalValueVector(Elts) ||
+        (isReallyPackedStruct &&
+         ParseToken(lltok::rbrace, "expected end of packed struct")) ||
+        ParseToken(lltok::rslash, "expected end of constant"))
+      return true;
+
+    if (isReallyPackedStruct) {
+      ID.ConstantStructElts = make_unique<Constant *[]>(Elts.size());
+      memcpy(ID.ConstantStructElts.get(), Elts.data(),
+             Elts.size() * sizeof(Elts[0]));
+      ID.UIntVal = Elts.size();
+      ID.Kind = ValID::t_ReallyPackedConstantStruct;
+      return false;
+    }
+
     return false;
   }
   case lltok::lsquare: {   // Array Constant
@@ -5092,11 +5127,13 @@ bool LLParser::ConvertValIDToValue(Type *Ty, ValID &ID, Value *&V,
     return false;
   case ValID::t_ConstantStruct:
   case ValID::t_PackedConstantStruct:
+  case ValID::t_ReallyPackedConstantStruct:
     if (StructType *ST = dyn_cast<StructType>(Ty)) {
       if (ST->getNumElements() != ID.UIntVal)
         return Error(ID.Loc,
                      "initializer with struct type has wrong # elements");
-      if (ST->isPacked() != (ID.Kind == ValID::t_PackedConstantStruct))
+      if (ST->isPacked() != (ID.Kind == ValID::t_PackedConstantStruct) && 
+          ST->isReallyPacked() != (ID.Kind == ValID::t_ReallyPackedConstantStruct))
         return Error(ID.Loc, "packed'ness of initializer and type don't match");
 
       // Verify that the elements are compatible with the structtype.
@@ -5127,7 +5164,8 @@ bool LLParser::parseConstantValue(Type *Ty, Constant *&C) {
   case ValID::t_Poison:
   case ValID::t_Constant:
   case ValID::t_ConstantStruct:
-  case ValID::t_PackedConstantStruct: {
+  case ValID::t_PackedConstantStruct: 
+  case ValID::t_ReallyPackedConstantStruct: {
     Value *V;
     if (ConvertValIDToValue(Ty, ID, V, /*PFS=*/nullptr, /*IsCall=*/false))
       return true;

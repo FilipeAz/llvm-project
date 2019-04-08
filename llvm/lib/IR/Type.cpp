@@ -339,9 +339,9 @@ bool FunctionType::isValidArgumentType(Type *ArgTy) {
 // Primitive Constructors.
 
 StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
-                            bool isPacked) {
+                            bool isPacked, bool isReallyPacked) {
   LLVMContextImpl *pImpl = Context.pImpl;
-  const AnonStructTypeKeyInfo::KeyTy Key(ETypes, isPacked);
+  const AnonStructTypeKeyInfo::KeyTy Key(ETypes, isPacked, isReallyPacked);
 
   StructType *ST;
   // Since we only want to allocate a fresh struct type in case none is found
@@ -355,7 +355,7 @@ StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
     // in-place.
     ST = new (Context.pImpl->TypeAllocator) StructType(Context);
     ST->setSubclassData(SCDB_IsLiteral);  // Literal struct.
-    ST->setBody(ETypes, isPacked);
+    ST->setBody(ETypes, isPacked, isReallyPacked);
     *Insertion.first = ST;
   } else {
     // The struct type was found. Just return it.
@@ -365,13 +365,14 @@ StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
   return ST;
 }
 
-void StructType::setBody(ArrayRef<Type*> Elements, bool isPacked) {
+void StructType::setBody(ArrayRef<Type*> Elements, bool isPacked, bool isReallyPacked) {
   assert(isOpaque() && "Struct body already set!");
 
   setSubclassData(getSubclassData() | SCDB_HasBody);
   if (isPacked)
     setSubclassData(getSubclassData() | SCDB_Packed);
-
+  if (isReallyPacked)
+    setSubclassData(getSubclassData() | SCDB_ReallyPacked);
   NumContainedTys = Elements.size();
 
   if (Elements.empty()) {
