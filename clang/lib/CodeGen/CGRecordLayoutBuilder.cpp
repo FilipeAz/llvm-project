@@ -26,7 +26,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-
+#include <iostream>
 using namespace clang;
 using namespace CodeGen;
 
@@ -837,39 +837,45 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     // Insert the fields that are not bitfields in order
     while(FieldsDeclVector[fieldTypesIndex].first != OrderedBitFields[0].first) {
       newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
-      newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex++));
+      newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex));
+      newFieldsIndex++;
       fieldTypesIndex++;
     }
     
     // When the first declared bitfield is declared it gets stored in the newFieldTypes, used to allocate space for the entire
     // struct, and in the newFields, used to get the index of the field when we want to get the pointer to load or store.
     newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[0].second.Size));
-    newFields.insert(std::make_pair(OrderedBitFields[0].first, newFieldsIndex++));
+    newFields.insert(std::make_pair(OrderedBitFields[0].first, newFieldsIndex));
+    newFieldsIndex++;
     
     // A cycle to basically finish the insertion of fields in order
     for(unsigned int index = 1; index < Builder.BitFields.size(); index++) {
       // If the offset is != 0 we update the amount of bits inserted that belonged to the previous word
       if(OrderedBitFields[index].second.Offset != 0) {
         newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[index].second.Size));
-        newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex++));
+        newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex));
+        newFieldsIndex++;
         oldSize += OrderedBitFields[index].second.Size;
       } else {
         // If there were leftover bits insert them here with a null declaration since they dont belong to anyone
         if(oldStorageSize - oldSize != 0) {
           newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), oldStorageSize - oldSize));
-          newFields.insert(std::make_pair(nullptr, newFieldsIndex++));
+          newFields.insert(std::make_pair(nullptr, newFieldsIndex));
+          newFieldsIndex++;
         }
         fieldTypesIndex++;
         // Again, insert the regular struct fields until we find another bitfield declaration
         while(FieldsDeclVector[fieldTypesIndex].first != OrderedBitFields[index].first) {
           newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
-          newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex++));
+          newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex));
+          newFieldsIndex++;
           fieldTypesIndex++;
         }
         
         newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[index].second.Size));
-        newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex++));
-      
+        newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex));
+        newFieldsIndex++;
+
         oldSize = OrderedBitFields[index].second.Size;
         oldStorageSize = OrderedBitFields[index].second.StorageSize;
       }
@@ -878,7 +884,8 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     // If there are any leftover bits after the last bitfield, insert them here
     if(oldStorageSize - oldSize != 0) {
       newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), oldStorageSize - oldSize));
-      newFields.insert(std::make_pair(nullptr, newFieldsIndex++));
+      newFields.insert(std::make_pair(nullptr, newFieldsIndex));
+      newFieldsIndex++;
     }
     
     fieldTypesIndex++;
@@ -886,7 +893,8 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     // If there are any fields after the last bitfield, insert them here
     for(; fieldTypesIndex != typeSize; fieldTypesIndex++) {
       newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
-      newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex++));
+      newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex));
+      newFieldsIndex++;
     }
     
     // Bitfields using vectors of i1s
@@ -936,11 +944,11 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
   RL->CompleteObjectVirtualBases.swap(Builder.VirtualBases);
 
   // Add all the field numbers.
-  //if(!Builder.BitFields.empty() && !D->isUnion()) {
-	//RL->FieldInfo.swap(/*Builder.Fields*/newFields);
-  //} else {
-	RL->FieldInfo.swap(Builder.Fields);
-//  }
+  if(!Builder.BitFields.empty() && !D->isUnion()) {
+	  RL->FieldInfo.swap(/*Builder.Fields*/newFields);
+  } else {
+	  RL->FieldInfo.swap(Builder.Fields);
+  }
   
   // Add bitfield info.
   RL->BitFields.swap(Builder.BitFields);

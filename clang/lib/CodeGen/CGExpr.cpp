@@ -36,7 +36,7 @@
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Transforms/Utils/SanitizerStats.h"
-
+#include <iostream>
 #include <string>
 
 using namespace clang;
@@ -3948,7 +3948,7 @@ LValue CodeGenFunction::EmitLValueForField(LValue base,
 	}*/
 	
 	unsigned Idx = RL.getLLVMFieldNo(field);
-	
+  
 	Addr = Builder.CreateStructGEP(Addr, Idx, Info.StorageOffset,
                                      field->getName());
 	

@@ -539,6 +539,8 @@ public:
 
   unsigned getAlignment() const { return StructAlignment; }
 
+  unsigned getNumElements() const { return NumElements; }
+
   /// Returns whether the struct has padding or not between its fields.
   /// NB: Padding in nested element is not taken into account.
   bool hasPadding() const { return IsPadded; }

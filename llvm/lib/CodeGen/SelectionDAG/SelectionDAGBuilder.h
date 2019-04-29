@@ -93,6 +93,9 @@ class SelectionDAGBuilder {
   /// CurInst - The current instruction being visited
   const Instruction *CurInst = nullptr;
 
+  /// ReallyPackedStructMap - The really packed struct being visited by SDValue
+  DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>> ReallyPackedStructMap;
+
   DenseMap<const Value*, SDValue> NodeMap;
 
   /// UnusedArgNodeMap - Maps argument value for unused arguments. This is used

@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <tuple>
 #include <utility>
-
+#include <iostream>
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -48,37 +48,54 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   StructSize = 0;
   IsPadded = false;
   NumElements = ST->getNumElements();
-  
+  int bitsUsed = 0;
+  int byteOffset = 0;
+
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
     Type *Ty = ST->getElementType(i);
     unsigned TyAlign = ST->isPacked() ? 1 : DL.getABITypeAlignment(Ty);
-    
+
     // Add padding if necessary to align the data element properly.
-    if (ST->isReallyPacked()) {
-      IsPadded = true;
-    }
-    else if ((StructSize & (TyAlign-1)) != 0) {
+    if ((StructSize & (TyAlign-1)) != 0 && !ST->isReallyPacked()) {
       IsPadded = true;
       StructSize = alignTo(StructSize, TyAlign);
+      MemberOffsets[i] = StructSize;
+    } else if (ST->isReallyPacked()) {
+      MemberOffsets[i] = bitsUsed;
+      std::cout << "offset: " << bitsUsed << std::endl;
+      if (Ty->isStructTy()) {
+        StructSize += DL.getTypeAllocSize(Ty) * 8;
+        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+      }
+      else if (Ty->isArrayTy()) {
+        StructSize += DL.getTypeAllocSize(Ty) * 8;
+        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+      }
+      else if (Ty->isIntegerTy()) {
+        StructSize += Ty->getPrimitiveSizeInBits();
+        bitsUsed += Ty->getPrimitiveSizeInBits();
+      }
+      //bitsUsed += Ty->getTypeID() == 14 ? Ty->getArrayNumElements() * Ty->getArrayElementType()->getPrimitiveSizeInBits() 
+      //              : Ty->getPrimitiveSizeInBits();
+      //MemberOffsets[i] = byteOffset;
+      
+      /*if (bitsUsed % 8 == 0 && bitsUsed != 0) {
+        byteOffset += bitsUsed / 8;
+        bitsUsed = 0;
+      }*/
+      continue;
     }
 
     // Keep track of maximum alignment constraint.
     StructAlignment = std::max(TyAlign, StructAlignment);
+    std::cout << "structsize: " << StructSize << std::endl;
+    //MemberOffsets[i] = StructSize;
+    StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
+  }
 
-    if(ST->isReallyPacked()) {
-      MemberOffsets[i] = StructSize;
-      if(Ty->getTypeID() == 14) {
-        StructSize += Ty->getArrayElementType()->getPrimitiveSizeInBits() * Ty->getArrayNumElements(); // Consume space for this data item
-      }
-      else {
-        StructSize += Ty->getPrimitiveSizeInBits(); // Consume space for this data item
-      }
-    }
-    else {
-      MemberOffsets[i] = StructSize;
-      StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
-    }
+  if (ST->isReallyPacked()) {
+    StructSize /= 8;
   }
 
   // Empty structures have alignment of 1 byte.
@@ -86,10 +103,7 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 
   // Add padding to the end of the struct so that it could be put in an array
   // and all array elements would be aligned correctly.
-  if (ST->isReallyPacked()) {
-    StructSize /= 8;
-  }
-  else if ((StructSize & (StructAlignment-1)) != 0) {
+  if ((StructSize & (StructAlignment-1)) != 0) {
     IsPadded = true;
     StructSize = alignTo(StructSize, StructAlignment);
   }
