@@ -48,8 +48,8 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   StructSize = 0;
   IsPadded = false;
   NumElements = ST->getNumElements();
+  IsReallyPacked = ST->isReallyPacked();
   int bitsUsed = 0;
-  int byteOffset = 0;
 
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
@@ -57,13 +57,14 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
     unsigned TyAlign = ST->isPacked() ? 1 : DL.getABITypeAlignment(Ty);
 
     // Add padding if necessary to align the data element properly.
-    if ((StructSize & (TyAlign-1)) != 0 && !ST->isReallyPacked()) {
+    if ((StructSize & (TyAlign-1)) != 0 && !IsReallyPacked) {
       IsPadded = true;
       StructSize = alignTo(StructSize, TyAlign);
       MemberOffsets[i] = StructSize;
-    } else if (ST->isReallyPacked()) {
+    } else if (IsReallyPacked) {
       MemberOffsets[i] = bitsUsed;
-      std::cout << "offset: " << bitsUsed << std::endl;
+      std::cout << "i: " << i << " offset: " << bitsUsed << std::endl;
+      std::cout << "structsize: " << StructSize << std::endl;
       if (Ty->isStructTy()) {
         StructSize += DL.getTypeAllocSize(Ty) * 8;
         bitsUsed += DL.getTypeAllocSize(Ty) * 8;

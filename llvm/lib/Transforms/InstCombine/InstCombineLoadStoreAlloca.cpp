@@ -24,6 +24,7 @@
 #include "llvm/IR/MDBuilder.h"
 #include "llvm/IR/PatternMatch.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
+#include <iostream>
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1388,7 +1389,7 @@ static bool removeBitcastsFromLoadStoreOnMinMax(InstCombiner &IC,
 Instruction *InstCombiner::visitStoreInst(StoreInst &SI) {
   Value *Val = SI.getOperand(0);
   Value *Ptr = SI.getOperand(1);
-
+std::cout << "store" << std::endl;
   // Try to canonicalize the stored type.
   if (combineStoreToValueType(*this, SI))
     return eraseInstFromFunction(SI);

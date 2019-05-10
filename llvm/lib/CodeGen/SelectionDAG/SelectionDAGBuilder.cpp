@@ -1580,6 +1580,7 @@ void SelectionDAGBuilder::visitCatchSwitch(const CatchSwitchInst &CSI) {
 }
 
 void SelectionDAGBuilder::visitRet(const ReturnInst &I) {
+  std::cout << "iguikraehguier" << std::endl;
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   auto &DL = DAG.getDataLayout();
   SDValue Chain = getControlRoot();
@@ -3090,6 +3091,7 @@ void SelectionDAGBuilder::visitTrunc(const User &I) {
 }
 
 void SelectionDAGBuilder::visitZExt(const User &I) {
+  std::cout << "zext" << std::endl;
   // ZExt cannot be a no-op cast because sizeof(src) < sizeof(dest).
   // ZExt also can't be a cast to bool for same reason. So, nothing much to do
   SDValue N = getValue(I.getOperand(0));
@@ -3520,7 +3522,7 @@ void SelectionDAGBuilder::visitExtractValue(const User &I) {
 
 void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   Value *Op0 = I.getOperand(0);
-  //std::cout << "Op0 type: " << Op0->getType()->getPointerElementType()->getTypeID() << std::endl;
+  std::cout << "Op0 type: " << Op0->getType()->getPointerElementType()->getTypeID() << std::endl;
   // Note that the pointer operand may be a vector of pointers. Take the scalar
   // element which holds a pointer.
   unsigned AS = Op0->getType()->getScalarType()->getPointerAddressSpace();
@@ -3541,14 +3543,20 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   for (gep_type_iterator GTI = gep_type_begin(&I), E = gep_type_end(&I);
        GTI != E; ++GTI) {
     const Value *Idx = GTI.getOperand();
+    //std::cout << (GTI.getOperand() == I.getOperand(0)) << std::endl;
+    std::cout << "isel type: " << Idx->getType()->getTypeID() << std::endl;
+    std::cout << "isel size: " << Idx->getType()->getPrimitiveSizeInBits() << std::endl;
     if (StructType *StTy = GTI.getStructTypeOrNull()) {
+      std::cout << "im a struct" << std::endl;
       unsigned Field = cast<Constant>(Idx)->getUniqueInteger().getZExtValue();
       if (Field) {
         // N = N + Offset
         const StructLayout *StrLay = DL->getStructLayout(StTy);
+        for (int asd = 0; asd < StrLay->getNumElements(); asd++)
+          std::cout << "asd: " << asd << " offset: " <<StrLay->getElementOffset(asd) << std::endl;
         uint64_t Offset = StrLay->getElementOffset(Field);
         
-        std::cout << "Offset: " << Offset << std::endl;
+        std::cout << "Offset: " << Offset << " Field: " << Field << std::endl;
         // In an inbounds GEP with an offset that is nonnegative even when
         // interpreted as signed, assume there is no unsigned overflow.
         SDNodeFlags Flags;
@@ -3684,7 +3692,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
 void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   if (I.isAtomic())
     return visitAtomicLoad(I);
-
+std::cout << "loaddd" << std::endl;
   const TargetLowering &TLI = DAG.getTargetLoweringInfo();
   const Value *SV = I.getOperand(0);
   if (TLI.supportSwiftError()) {
@@ -3786,6 +3794,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
 
     if (iter != ReallyPackedStructMap.end()) {
+      std::cout << "load" << std::endl;
       const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
       unsigned Field = std::get<1>(ReallyPackedStructMap[Ptr]);
       uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);
@@ -3928,7 +3937,7 @@ void SelectionDAGBuilder::visitLoadFromSwiftError(const LoadInst &I) {
 void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   if (I.isAtomic())
     return visitAtomicStore(I);
-    
+    std::cout << "im in visit store" << std::endl;
   const Value *SrcV = I.getOperand(0);
   Value *PtrV = I.getOperand(1);
 
@@ -3995,14 +4004,15 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   
 
     DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
-
+    //std::cout << "are: " << Ptr->getValueSizeInBits(0) << std::endl;
     if (iter != ReallyPackedStructMap.end()) {
+      std::cout << "im in" << std::endl;
       const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
       unsigned Field = std::get<1>(ReallyPackedStructMap[Ptr]);
       uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);
       uint64_t bitFieldSize;
       uint16_t loadSize;
-      //std::cout << "Offset: " << Offset << " Field: " << Field << std::endl;
+      std::cout << "Offset: " << Offset << " Field: " << Field << std::endl;
       if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -4024,7 +4034,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
         else
           loadSize = (bitFieldSize / 8) + 1;
       }
-      //std::cout << "loadsize: " << loadSize << std::endl;
+      std::cout << "loadsize: " << loadSize << std::endl;
       Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
       static EVT PtrTy = EVT::getEVT(loadType);
       //std::cout << "type: " << PtrTy.getTypeForEVT(*DAG.getContext())->getTypeID() << " and to what: " << PtrTy.getTypeForEVT(*DAG.getContext())->getPrimitiveSizeInBits() << std::endl; 

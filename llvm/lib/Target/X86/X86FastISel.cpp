@@ -40,6 +40,7 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Target/TargetOptions.h"
+#include <iostream>
 using namespace llvm;
 
 namespace {
@@ -920,7 +921,11 @@ redo_gep:
          i != e; ++i, ++GTI) {
       const Value *Op = *i;
       if (StructType *STy = GTI.getStructTypeOrNull()) {
+        std::cout << "x86" << std::endl;
         const StructLayout *SL = DL.getStructLayout(STy);
+        if (SL->isReallyPacked()) {
+          return false;
+        }
         Disp += SL->getElementOffset(cast<ConstantInt>(Op)->getZExtValue());
         continue;
       }

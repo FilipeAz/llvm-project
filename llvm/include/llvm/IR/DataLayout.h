@@ -531,6 +531,7 @@ class StructLayout {
   unsigned IsPadded : 1;
   unsigned NumElements : 31;
   uint64_t MemberOffsets[1]; // variable sized array!
+  bool IsReallyPacked;
 
 public:
   uint64_t getSizeInBytes() const { return StructSize; }
@@ -540,6 +541,8 @@ public:
   unsigned getAlignment() const { return StructAlignment; }
 
   unsigned getNumElements() const { return NumElements; }
+
+  bool isReallyPacked() const { return IsReallyPacked; }
 
   /// Returns whether the struct has padding or not between its fields.
   /// NB: Padding in nested element is not taken into account.
