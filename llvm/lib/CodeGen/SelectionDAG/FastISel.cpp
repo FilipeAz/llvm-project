@@ -108,7 +108,6 @@
 #include <cstdint>
 #include <iterator>
 #include <utility>
-#include <iostream>
 
 using namespace llvm;
 using namespace PatternMatch;
@@ -675,8 +674,7 @@ bool FastISel::selectBinaryOp(const User *I, unsigned ISDOpcode) {
 
 bool FastISel::selectGetElementPtr(const User *I) {
   unsigned N = getRegForValue(I->getOperand(0));
-  Value *Op0 = I->getOperand(0);
-std::cout << "Op0 type: " << Op0->getType()->getPointerElementType()->getTypeID() << std::endl;
+
   if (!N) // Unhandled operand. Halt "fast" selection and bail.
     return false;
   bool NIsKill = hasTrivialKill(I->getOperand(0));
@@ -689,10 +687,8 @@ std::cout << "Op0 type: " << Op0->getType()->getPointerElementType()->getTypeID(
   for (gep_type_iterator GTI = gep_type_begin(I), E = gep_type_end(I);
        GTI != E; ++GTI) {
     const Value *Idx = GTI.getOperand();
-    std::cout << "isel type: " << Idx->getType()->getTypeID() << std::endl;
-    std::cout << "isel size: " << Idx->getType()->getPrimitiveSizeInBits() << std::endl;
+    
     if (StructType *StTy = GTI.getStructTypeOrNull()) {
-    std::cout << "isel if" << std::endl;
       uint64_t Field = cast<ConstantInt>(Idx)->getZExtValue();
       if (Field) {
         // N = N + Offset
@@ -1283,7 +1279,6 @@ bool FastISel::lowerCall(const CallInst *CI) {
 
 bool FastISel::selectCall(const User *I) {
   const CallInst *Call = cast<CallInst>(I);
-std::cout << "call" << std::endl;
   // Handle simple inline asms.
   if (const InlineAsm *IA = dyn_cast<InlineAsm>(Call->getCalledValue())) {
     // If the inline asm has side effects, then make sure that no local value

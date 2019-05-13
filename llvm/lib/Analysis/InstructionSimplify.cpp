@@ -38,7 +38,7 @@
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/Support/KnownBits.h"
 #include <algorithm>
-#include <iostream>
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -4049,7 +4049,6 @@ Value *llvm::SimplifySelectInst(Value *Cond, Value *TrueVal, Value *FalseVal,
 static Value *SimplifyGEPInst(Type *SrcTy, ArrayRef<Value *> Ops,
                               const SimplifyQuery &Q, unsigned) {
   // The type of the GEP pointer operand.
-  std::cout << "lol" << std::endl;
   unsigned AS =
       cast<PointerType>(Ops[0]->getType()->getScalarType())->getAddressSpace();
 

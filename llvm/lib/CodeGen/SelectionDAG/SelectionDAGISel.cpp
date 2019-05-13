@@ -100,7 +100,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <iostream>
+
 using namespace llvm;
 
 #define DEBUG_TYPE "isel"
@@ -1569,7 +1569,6 @@ void SelectionDAGISel::SelectAllBasicBlocks(const Function &Fn) {
     LLVM_DEBUG(dbgs() << "Enabling fast-isel\n");
     FastIS = TLI->createFastISel(*FuncInfo, LibInfo);
   }
-std::cout << "one function" << std::endl;
   setupSwiftErrorVals(Fn, TLI, FuncInfo);
 
   ReversePostOrderTraversal<const Function*> RPOT(&Fn);
@@ -1677,10 +1676,7 @@ std::cout << "one function" << std::endl;
       // Do FastISel on as many instructions as possible.
       for (; BI != Begin; --BI) {
         const Instruction *Inst = &*std::prev(BI);
-        /*std::cout << "selectallbasicblocks isnt: " << Inst->getOpcode() << std::endl;
-        if (Inst->getOpcode() == Instruction::GetElementPtr || Inst->getOpcode() == Instruction::Load || Inst->getOpcode() == Instruction::Store) {
-          break;
-        }*/
+
         // If we no longer require this instruction, skip it.
         if (isFoldedOrDeadInstruction(Inst, FuncInfo) ||
             ElidedArgCopyInstrs.count(Inst)) {

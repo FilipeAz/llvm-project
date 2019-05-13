@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <tuple>
 #include <utility>
-#include <iostream>
+
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -62,36 +62,24 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
       StructSize = alignTo(StructSize, TyAlign);
       MemberOffsets[i] = StructSize;
     } else if (IsReallyPacked) {
+      // Calculate offsets for the bitfields of Really Packed Structs.
       MemberOffsets[i] = bitsUsed;
-      std::cout << "i: " << i << " offset: " << bitsUsed << std::endl;
-      std::cout << "structsize: " << StructSize << std::endl;
-      if (Ty->isStructTy()) {
-        StructSize += DL.getTypeAllocSize(Ty) * 8;
-        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
-      }
-      else if (Ty->isArrayTy()) {
-        StructSize += DL.getTypeAllocSize(Ty) * 8;
-        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
-      }
-      else if (Ty->isIntegerTy()) {
+      
+      if (Ty->isIntegerTy()) {
         StructSize += Ty->getPrimitiveSizeInBits();
         bitsUsed += Ty->getPrimitiveSizeInBits();
       }
-      //bitsUsed += Ty->getTypeID() == 14 ? Ty->getArrayNumElements() * Ty->getArrayElementType()->getPrimitiveSizeInBits() 
-      //              : Ty->getPrimitiveSizeInBits();
-      //MemberOffsets[i] = byteOffset;
-      
-      /*if (bitsUsed % 8 == 0 && bitsUsed != 0) {
-        byteOffset += bitsUsed / 8;
-        bitsUsed = 0;
-      }*/
+      else {
+        StructSize += DL.getTypeAllocSize(Ty) * 8;
+        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+      }
+
       continue;
     }
 
     // Keep track of maximum alignment constraint.
     StructAlignment = std::max(TyAlign, StructAlignment);
-    std::cout << "structsize: " << StructSize << std::endl;
-    //MemberOffsets[i] = StructSize;
+
     StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
   }
 

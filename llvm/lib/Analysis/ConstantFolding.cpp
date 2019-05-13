@@ -1007,6 +1007,12 @@ Constant *ConstantFoldInstOperandsImpl(const Value *InstOrCE, unsigned Opcode,
     return ConstantFoldCastOperand(Opcode, Ops[0], DestTy, DL);
 
   if (auto *GEP = dyn_cast<GEPOperator>(InstOrCE)) {
+
+    if (isa<StructType>(GEP->getSourceElementType())) {
+      if (cast<StructType>(GEP->getSourceElementType())->isReallyPacked())
+        return nullptr;
+    }
+
     if (Constant *C = SymbolicallyEvaluateGEP(GEP, Ops, DL, TLI))
       return C;
 

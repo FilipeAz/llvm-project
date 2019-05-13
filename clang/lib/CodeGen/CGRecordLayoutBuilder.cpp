@@ -26,7 +26,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include <iostream>
+
 using namespace clang;
 using namespace CodeGen;
 
@@ -720,38 +720,31 @@ CGBitFieldInfo CGBitFieldInfo::MakeInfo(CodeGenTypes &Types,
   return CGBitFieldInfo(Offset, Size, IsSigned, StorageSize, StorageOffset);
 }
 
-// GCD calculating function
-/*int gcd(int a, int b) {
-  return b == 0 ? a : gcd(b, a % b);
-}*/
-
 bool wayToSortBitFields(std::pair<const FieldDecl *, CGBitFieldInfo> a, std::pair<const FieldDecl *, CGBitFieldInfo> b) {
   if(std::get<1>(a).StorageOffset.getQuantity() < std::get<1>(b).StorageOffset.getQuantity())
-	return true;
-  else if(std::get<1>(a).StorageOffset.getQuantity() > std::get<1>(b).StorageOffset.getQuantity())
-	return false;
-  else {
-	if(std::get<1>(a).Offset < std::get<1>(b).Offset)
 	  return true;
+  else if(std::get<1>(a).StorageOffset.getQuantity() > std::get<1>(b).StorageOffset.getQuantity())
+	  return false;
+  else {
+	  if(std::get<1>(a).Offset < std::get<1>(b).Offset)
+	    return true;
     else if(std::get<1>(a).Offset > std::get<1>(b).Offset)
-	 return false;
+	    return false;
   }
-  
   return false;
 }
 
 bool wayToSortFieldsDecl(std::pair<const FieldDecl *, unsigned> a, std::pair<const FieldDecl *, unsigned> b) {
   if(std::get<1>(a) < std::get<1>(b))
-	return true;
-  else if(std::get<1>(a) > std::get<1>(b))
-	return false;
-  else {
-	if(std::get<0>(a)->getFieldIndex() < std::get<0>(b)->getFieldIndex())
 	  return true;
+  else if(std::get<1>(a) > std::get<1>(b))
+	  return false;
+  else {
+	  if(std::get<0>(a)->getFieldIndex() < std::get<0>(b)->getFieldIndex())
+	    return true;
     else if(std::get<0>(a)->getFieldIndex() > std::get<0>(b)->getFieldIndex())
-	 return false;
+	    return false;
   }
-  
   return false;
 }
   
@@ -779,6 +772,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
              "Non-virtual and complete types must agree on packedness");
     }
   }
+
   // New DenseMap where the index of the fields will be stored so that they can be accessed later
   llvm::DenseMap<const FieldDecl *, unsigned> newFields;
   
@@ -787,21 +781,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     // First we need to find out how many bits are actually needed (padding and everything) 
     // to safely store this struct
 
-    unsigned int numStorageSize = 0;
-
-    size_t typeSize = Builder.FieldTypes.size();
-
-    for(unsigned int typeIter = 0; typeIter != typeSize; typeIter++) {
-
-      if(Builder.FieldTypes[typeIter]->getTypeID() == 14) {
-        numStorageSize += (Builder.FieldTypes[typeIter]->getArrayElementType()->getPrimitiveSizeInBits() * Builder.FieldTypes[typeIter]->getArrayNumElements());
-      }
-      else {
-        numStorageSize += Builder.FieldTypes[typeIter]->getPrimitiveSizeInBits();
-      }
-    }
-
-    // Vector to where the new bitfield sizes (according to the GCD) will be stored
+    // Vector to where the bitfield sizes will be stored
     SmallVector<llvm::Type *, 16> newFieldTypes;
 
 
@@ -816,13 +796,13 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       i++;
     }
 
+    // Sort by order of declaration
     std::sort(OrderedBitFields, OrderedBitFields + Builder.BitFields.size(), wayToSortBitFields);
     
-    //HERE!!!!!!!
     unsigned int fieldTypesIndex = 0;
     int oldSize = OrderedBitFields[0].second.Size, oldStorageSize = OrderedBitFields[0].second.StorageSize;
     
-    // A vector of pairs containing the declarations of all fields declared in order
+    // A vector of pairs containing the declarations of all fields declared
     std::pair<const FieldDecl *, unsigned> *FieldsDeclVector = new std::pair<const FieldDecl *, unsigned>[Builder.Fields.size()];
     
     llvm::DenseMap<const FieldDecl *, unsigned>::iterator fieldsIterator = Builder.Fields.begin();
@@ -832,9 +812,10 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       fieldsIterator++;
     }
     
+    // Sort by order of declaration
     std::sort(FieldsDeclVector, FieldsDeclVector + Builder.Fields.size(), wayToSortFieldsDecl);
     
-    // Insert the fields that are not bitfields in order
+    // Insert the declared fields in order until we find a bitdield
     while(FieldsDeclVector[fieldTypesIndex].first != OrderedBitFields[0].first) {
       newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
       newFields.insert(std::make_pair(FieldsDeclVector[fieldTypesIndex].first, newFieldsIndex));
@@ -842,13 +823,14 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       fieldTypesIndex++;
     }
     
-    // When the first declared bitfield is declared it gets stored in the newFieldTypes, used to allocate space for the entire
-    // struct, and in the newFields, used to get the index of the field when we want to get the pointer to load or store.
+    // When the first declared bitfield is found it gets stored in the newFieldTypes, 
+    // used to allocate space for the entire struct, and in the newFields, used to get 
+    // the index of the field when we want to get the pointer to load or store.
     newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[0].second.Size));
     newFields.insert(std::make_pair(OrderedBitFields[0].first, newFieldsIndex));
     newFieldsIndex++;
     
-    // A cycle to basically finish the insertion of fields in order
+    // A cycle to finish the insertion of fields in order
     for(unsigned int index = 1; index < Builder.BitFields.size(); index++) {
       // If the offset is != 0 we update the amount of bits inserted that belonged to the previous word
       if(OrderedBitFields[index].second.Offset != 0) {
@@ -871,7 +853,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
           newFieldsIndex++;
           fieldTypesIndex++;
         }
-        
+        // Store the newly found bitfield
         newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[index].second.Size));
         newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex));
         newFieldsIndex++;
@@ -890,6 +872,8 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     
     fieldTypesIndex++;
     
+    size_t typeSize = Builder.FieldTypes.size();
+
     // If there are any fields after the last bitfield, insert them here
     for(; fieldTypesIndex != typeSize; fieldTypesIndex++) {
       newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
@@ -897,40 +881,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       newFieldsIndex++;
     }
     
-    // Bitfields using vectors of i1s
-    /*std::pair<const FieldDecl *, unsigned> *FieldsDeclVector = new std::pair<const FieldDecl *, unsigned>[Builder.Fields.size()];
-    
-    llvm::DenseMap<const FieldDecl *, unsigned>::iterator fieldsIterator = Builder.Fields.begin();
-    
-    unsigned int index = 0;
-    
-    for(; index < Builder.Fields.size(); index++) {
-      FieldsDeclVector[index] = std::make_pair(fieldsIterator->first, fieldsIterator->second);
-      fieldsIterator++;
-    }
-    
-    std::sort(FieldsDeclVector, FieldsDeclVector + Builder.Fields.size(), wayToSortFieldsDecl);
-        
-    for(unsigned int i = 0, FieldTypesIterator = 0; i < index; i++) {
-      if(FieldsDeclVector[i].first->isBitField()) {
-        CGBitFieldInfo iteratedInfo = Builder.BitFields.lookup(FieldsDeclVector[i].first);
-        if(iteratedInfo.Offset == 0) {
-          Builder.FieldTypes[FieldTypesIterator] = cast<llvm::VectorType>(llvm::IntegerType::get(Ty->getContext(), iteratedInfo.StorageSize));
-          //Builder.FieldTypes[FieldTypesIterator] = llvm::VectorType::get(llvm::IntegerType::get(Ty->getContext(), 1), iteratedInfo.StorageSize);
-          FieldTypesIterator++;
-        } 
-        continue;
-      }
-      FieldTypesIterator++;
-    }*/
-    
-    /*for(int i = 0; i < Builder.FieldTypes.size(); i++) {
-      if(Builder.FieldTypes[i]->getTypeID()==16)
-        std::cout << "types: " << Builder.FieldTypes[i]->getScalarSizeInBits() << "size: " << Builder.FieldTypes[i]->getVectorNumElements() << std::endl;
-      else
-        std::cout << "types: " << Builder.FieldTypes[i]->getArrayElementType()->getPrimitiveSizeInBits() << "size: " << Builder.FieldTypes[i]->getArrayNumElements() << std::endl;
-    }*/
-    
+    // Finally set the body of the struct with the newly calculated bitfield storage
     Ty->setBody(/*Builder.FieldTypes*/newFieldTypes, Builder.Packed, true);
   } else {
 	  Ty->setBody(Builder.FieldTypes, Builder.Packed);  

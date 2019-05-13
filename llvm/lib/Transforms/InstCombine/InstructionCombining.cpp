@@ -102,7 +102,6 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <iostream>
 
 using namespace llvm;
 using namespace llvm::PatternMatch;
@@ -1551,7 +1550,6 @@ Instruction *InstCombiner::narrowMathIfNoOverflow(BinaryOperator &BO) {
 }
 
 Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
-  std::cout << "getep" << std::endl;
   SmallVector<Value*, 8> Ops(GEP.op_begin(), GEP.op_end());
   Type *GEPType = GEP.getType();
   Type *GEPEltType = GEP.getSourceElementType();
@@ -1604,7 +1602,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
 
   // Check to see if the inputs to the PHI node are getelementptr instructions.
   if (auto *PN = dyn_cast<PHINode>(PtrOp)) {
-    std::cout << "phinode" << std::endl;
     auto *Op1 = dyn_cast<GetElementPtrInst>(PN->getOperand(0));
     if (!Op1)
       return nullptr;
@@ -1714,7 +1711,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   // is a getelementptr instruction, combine the indices of the two
   // getelementptr instructions into a single instruction.
   if (auto *Src = dyn_cast<GEPOperator>(PtrOp)) {
-    std::cout << "ptrop" << std::endl;
     if (!shouldMergeGEPs(*cast<GEPOperator>(&GEP), *Src))
       return nullptr;
 
@@ -1832,7 +1828,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   }
 
   if (GEP.getNumIndices() == 1) {
-    std::cout << "num indices is 1" << std::endl;
     unsigned AS = GEP.getPointerAddressSpace();
     if (GEP.getOperand(1)->getType()->getScalarSizeInBits() ==
         DL.getIndexSizeInBits(AS)) {
@@ -1884,7 +1879,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   PointerType *StrippedPtrTy = cast<PointerType>(StrippedPtr->getType());
 
   if (StrippedPtr != PtrOp) {
-    std::cout << "strippedptr differs ptrop" << std::endl;
     bool HasZeroPointerIndex = false;
     if (auto *C = dyn_cast<ConstantInt>(GEP.getOperand(1)))
       HasZeroPointerIndex = C->isZero();
@@ -2056,7 +2050,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   // through the addrspacecast.
   Value *ASCStrippedPtrOp = PtrOp;
   if (auto *ASC = dyn_cast<AddrSpaceCastInst>(PtrOp)) {
-    std::cout << "addrspacecastint" << std::endl;
     //   X = bitcast A addrspace(1)* to B addrspace(1)*
     //   Y = addrspacecast A addrspace(1)* to B addrspace(2)*
     //   Z = gep Y, <...constant indices...>
@@ -2066,7 +2059,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   }
 
   if (auto *BCI = dyn_cast<BitCastInst>(ASCStrippedPtrOp)) {
-    std::cout << "bitcast" << std::endl;
     Value *SrcOp = BCI->getOperand(0);
     PointerType *SrcType = cast<PointerType>(BCI->getSrcTy());
     Type *SrcEltType = SrcType->getElementType();
@@ -2154,7 +2146,6 @@ Instruction *InstCombiner::visitGetElementPtrInst(GetElementPtrInst &GEP) {
   }
 
   if (!GEP.isInBounds()) {
-    std::cout << "gep not in bounds" << std::endl;
     unsigned IdxWidth =
         DL.getIndexSizeInBits(PtrOp->getType()->getPointerAddressSpace());
     APInt BasePtrOffset(IdxWidth, 0);
