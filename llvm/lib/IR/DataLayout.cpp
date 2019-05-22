@@ -60,7 +60,6 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
     if ((StructSize & (TyAlign-1)) != 0 && !IsReallyPacked) {
       IsPadded = true;
       StructSize = alignTo(StructSize, TyAlign);
-      MemberOffsets[i] = StructSize;
     } else if (IsReallyPacked) {
       // Calculate offsets for the bitfields of Really Packed Structs.
       MemberOffsets[i] = bitsUsed;
@@ -79,7 +78,7 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 
     // Keep track of maximum alignment constraint.
     StructAlignment = std::max(TyAlign, StructAlignment);
-
+	MemberOffsets[i] = StructSize;
     StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
   }
 

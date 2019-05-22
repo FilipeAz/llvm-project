@@ -3545,6 +3545,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
       unsigned Field = cast<Constant>(Idx)->getUniqueInteger().getZExtValue();
       if (Field) {
         // N = N + Offset
+
         const StructLayout *StrLay = DL->getStructLayout(StTy);
         uint64_t Offset = StrLay->getElementOffset(Field);
 
@@ -3554,11 +3555,19 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
         if (int64_t(Offset) >= 0 && cast<GEPOperator>(I).isInBounds())
           Flags.setNoUnsignedWrap(true);
 
-        N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
+        if (StrLay->isReallyPacked()) {
+          N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
                         DAG.getConstant(Offset/8, dl, N.getValueType()), Flags);
-
-        ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, Field, Offset)));
-
+          ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, Field, Offset)));
+        } else {
+          N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
+                        DAG.getConstant(Offset, dl, N.getValueType()), Flags);
+        }
+	  } else {
+        const StructLayout *StrLay = DL->getStructLayout(StTy);
+        if (StrLay->isReallyPacked()) {
+          ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, 0, 0)));
+		}
       }
     } else {
       unsigned IdxSize = DAG.getDataLayout().getIndexSizeInBits(AS);
@@ -3837,7 +3846,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
                                       Flags);
 
       Values[i] = Zext;
-      Chains[ChainI] = Zext.getValue(1);
+      Chains[ChainI] = Zext.getValue(0);
     }
     else {
       SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, A,

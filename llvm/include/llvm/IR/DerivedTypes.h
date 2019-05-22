@@ -256,10 +256,10 @@ public:
   static StructType *create(LLVMContext &Context);
 
   static StructType *create(ArrayRef<Type *> Elements, StringRef Name,
-                            bool isPacked = false);
+                            bool isPacked = false, bool isReallyPacked = false);
   static StructType *create(ArrayRef<Type *> Elements);
   static StructType *create(LLVMContext &Context, ArrayRef<Type *> Elements,
-                            StringRef Name, bool isPacked = false);
+                            StringRef Name, bool isPacked = false, bool isReallyPacked = false);
   static StructType *create(LLVMContext &Context, ArrayRef<Type *> Elements);
   template <class... Tys>
   static typename std::enable_if<are_base_of<Type, Tys...>::value,
@@ -275,7 +275,7 @@ public:
                          bool isPacked = false, bool isReallyPacked = false);
 
   /// Create an empty structure type.
-  static StructType *get(LLVMContext &Context, bool isPacked = false);
+  static StructType *get(LLVMContext &Context, bool isPacked = false, bool isReallyPacked = false);
 
   /// This static method is a convenience method for creating structure types by
   /// specifying the elements as arguments. Note that this method always returns

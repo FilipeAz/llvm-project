@@ -441,14 +441,14 @@ StructType *StructType::create(LLVMContext &Context, StringRef Name) {
   return ST;
 }
 
-StructType *StructType::get(LLVMContext &Context, bool isPacked) {
-  return get(Context, None, isPacked);
+StructType *StructType::get(LLVMContext &Context, bool isPacked, bool isReallyPacked) {
+  return get(Context, None, isPacked, isReallyPacked);
 }
 
 StructType *StructType::create(LLVMContext &Context, ArrayRef<Type*> Elements,
-                               StringRef Name, bool isPacked) {
+                               StringRef Name, bool isPacked, bool isReallyPacked) {
   StructType *ST = create(Context, Name);
-  ST->setBody(Elements, isPacked);
+  ST->setBody(Elements, isPacked, isReallyPacked);
   return ST;
 }
 
@@ -461,10 +461,10 @@ StructType *StructType::create(LLVMContext &Context) {
 }
 
 StructType *StructType::create(ArrayRef<Type*> Elements, StringRef Name,
-                               bool isPacked) {
+                               bool isPacked, bool isReallyPacked) {
   assert(!Elements.empty() &&
          "This method may not be invoked with an empty list");
-  return create(Elements[0]->getContext(), Elements, Name, isPacked);
+  return create(Elements[0]->getContext(), Elements, Name, isPacked, isReallyPacked);
 }
 
 StructType *StructType::create(ArrayRef<Type*> Elements) {
