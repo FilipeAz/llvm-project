@@ -2,12 +2,12 @@
 // CHECK: STest1 = type { i32, [4 x i16], double }
 // CHECK: STest2 = type { i16, i16, i32, i32 }
 // CHECK: STest3 = type { i8, i16, i32 }
-// CHECK: STestB1 = type { i8, i8 }
-// CHECK: STestB2 = type { i8, i8, i8 }
-// CHECK: STestB3 = type { i8, i8 }
-// CHECK: STestB4 = type { i8, i8, i8, i8 }
-// CHECK: STestB5 = type { i8, i16, i8 }
-// CHECK: STestB6 = type { i8, i8, i16 }
+// CHECK: STestB1 = type \{ i8, i2, i6 }/
+// CHECK: STestB2 = type \{ i8, i5, i3, i4, i4 }/
+// CHECK: STestB3 = type \{ i8, i2, i6 }/
+// CHECK: STestB4 = type \{ i8, i2, i6, i8, i8 }/
+// CHECK: STestB5 = type \{ i8, i10, i6, i8 }/
+// CHECK: STestB6 = type \{ i1, i7, i8, i13, i3 }/
 // Test struct layout for x86-darwin target
 
 struct STest1 {int x; short y[4]; double z; } st1;

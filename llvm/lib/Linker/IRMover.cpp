@@ -811,7 +811,7 @@ IRLinker::linkAppendingVarProto(GlobalVariable *DstGV,
   if (IsOldStructor) {
     auto &ST = *cast<StructType>(EltTy);
     Type *Tys[3] = {ST.getElementType(0), ST.getElementType(1), VoidPtrTy};
-    EltTy = StructType::get(SrcGV->getContext(), Tys, false);
+    EltTy = StructType::get(SrcGV->getContext(), Tys, false, false);
   }
 
   uint64_t DstNumElements = 0;

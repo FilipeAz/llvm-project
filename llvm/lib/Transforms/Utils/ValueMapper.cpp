@@ -973,7 +973,7 @@ void Mapper::mapAppendingVariable(GlobalVariable &GV, Constant *InitPrefix,
     VoidPtrTy = Type::getInt8Ty(GV.getContext())->getPointerTo();
     auto &ST = *cast<StructType>(NewMembers.front()->getType());
     Type *Tys[3] = {ST.getElementType(0), ST.getElementType(1), VoidPtrTy};
-    EltTy = StructType::get(GV.getContext(), Tys, false);
+    EltTy = StructType::get(GV.getContext(), Tys, false, false);
   }
 
   for (auto *V : NewMembers) {

@@ -1,9 +1,9 @@
 // RUN: %clang_cc1 -x c -debug-info-kind=limited -emit-llvm -triple x86_64-apple-darwin -o - %s | FileCheck %s
 
-// CHECK: %struct.layout3 = type <{ i8, [3 x i8], %struct.size8_pack4, i8, [3 x i8] }>
-// CHECK: %struct.layout0 = type { i8, %struct.size8, i8 }
-// CHECK: %struct.layout1 = type <{ i8, %struct.size8_anon, i8, [2 x i8] }>
-// CHECK: %struct.layout2 = type <{ i8, %struct.size8_pack1, i8 }>
+// CHECK: %struct.layout3 = type \{ i8, [3 x i8], %struct.size8_pack4, i1, i7, [3 x i8] }/
+// CHECK: %struct.layout0 = type \{ i8, [7 x i8], %struct.size8, i1, i7, [7 x i8] }/
+// CHECK: %struct.layout1 = type \{ i8, %struct.size8_anon, i1, i7, [2 x i8] }/
+// CHECK: %struct.layout2 = type \{ i8, %struct.size8_pack1, i1, i7 }/
 
 // ---------------------------------------------------------------------
 // Not packed.

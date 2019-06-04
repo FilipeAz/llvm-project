@@ -141,8 +141,8 @@ void f(B b1) {
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[THIS]], i32 0, i32 1
 // CHECK-NEXT: [[OTHER:%.*]] = load [[A]]*, [[A]]**
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds [[A]], [[A]]* [[OTHER]], i32 0, i32 1
-// CHECK-NEXT: [[T4:%.*]] = bitcast i16* [[T0]] to i8*
-// CHECK-NEXT: [[T5:%.*]] = bitcast i16* [[T2]] to i8*
+// CHECK-NEXT: [[T4:%.*]] = bitcast i1* [[T0]] to i8*
+// CHECK-NEXT: [[T5:%.*]] = bitcast i1* [[T2]] to i8*
 // CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[T4]], i8* align 8 [[T5]], i64 8, i1 false)
 // CHECK-NEXT: ret [[A]]* [[THIS]]
 
@@ -170,8 +170,8 @@ void f(B b1) {
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds [[A]], [[A]]* [[THIS]], i32 0, i32 1
 // CHECK-NEXT: [[OTHER:%.*]] = load [[A]]*, [[A]]**
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds [[A]], [[A]]* [[OTHER]], i32 0, i32 1
-// CHECK-NEXT: [[T4:%.*]] = bitcast i16* [[T0]] to i8*
-// CHECK-NEXT: [[T5:%.*]] = bitcast i16* [[T2]] to i8*
+// CHECK-NEXT: [[T4:%.*]] = bitcast i1* [[T0]] to i8*
+// CHECK-NEXT: [[T5:%.*]] = bitcast i1* [[T2]] to i8*
 // CHECK-NEXT: call void @llvm.memcpy.p0i8.p0i8.i64(i8* align 8 [[T4]], i8* align 8 [[T5]], i64 8, i1 false)
 // CHECK-NEXT: ret void
 }

@@ -36,9 +36,9 @@ struct Inner {
 
 #pragma pack (pop)
 
-// CHECK: %struct.Inner = type { i32, i32 }
+// CHECK: %struct.Inner = type \{ i1, i1, i1, i29, i30, i2 }/
 
-// CHECK: %struct.A = type { i32, i32, i32 }
+// CHECK: %struct.A = type \{ i3, i9, i12, i8, i17, i7, i4, i4, i3, i5, i24 }/
 
 #pragma pack(push, 1)
 

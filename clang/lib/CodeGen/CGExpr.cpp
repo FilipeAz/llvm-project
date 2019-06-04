@@ -3791,9 +3791,9 @@ static Address emitAddrOfFieldStorage(CodeGenFunction &CGF, Address base,
   // Adjust the alignment down to the given offset.
   // As a special case, if the LLVM field index is 0, we know that this
   // is zero.
-  assert((idx != 0 || CGF.getContext().getASTRecordLayout(rec)
-                         .getFieldOffset(field->getFieldIndex()) == 0) &&
-         "LLVM field at index zero had non-zero offset?");
+  //assert((idx != 0 || CGF.getContext().getASTRecordLayout(rec)
+  //                       .getFieldOffset(field->getFieldIndex()) == 0) &&
+  //       "LLVM field at index zero had non-zero offset?");
   if (idx != 0) {
     auto &recLayout = CGF.getContext().getASTRecordLayout(rec);
     auto offsetInBits = recLayout.getFieldOffset(field->getFieldIndex());
@@ -4616,7 +4616,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
           CGM.GetAddrOfRTTIDescriptor(ProtoTy, /*ForEH=*/true);
       llvm::Type *PrefixStructTyElems[] = {PrefixSig->getType(), Int32Ty};
       llvm::StructType *PrefixStructTy = llvm::StructType::get(
-          CGM.getLLVMContext(), PrefixStructTyElems, /*isPacked=*/true);
+          CGM.getLLVMContext(), PrefixStructTyElems, /*isPacked=*/true, /*isReallyPacked=*/false);
 
       llvm::Value *CalleePtr = Callee.getFunctionPointer();
 

@@ -5134,7 +5134,7 @@ bool LLParser::ConvertValIDToValue(Type *Ty, ValID &ID, Value *&V,
       if (ST->getNumElements() != ID.UIntVal)
         return Error(ID.Loc,
                      "initializer with struct type has wrong # elements");
-      if (ST->isPacked() != (ID.Kind == ValID::t_PackedConstantStruct) && 
+      if (ST->isPacked() != (ID.Kind == ValID::t_PackedConstantStruct) || 
           ST->isReallyPacked() != (ID.Kind == ValID::t_ReallyPackedConstantStruct))
         return Error(ID.Loc, "packed'ness of initializer and type don't match");
 
