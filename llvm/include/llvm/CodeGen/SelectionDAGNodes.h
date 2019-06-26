@@ -126,12 +126,23 @@ class SDValue {
   SDNode *Node = nullptr; // The node defining the value we are using.
   unsigned ResNo = 0;     // Which return value of the node we are using.
 
+  int ValueID = -1; // ID used to diferentiate similar nodes in the visitors of loads and stores.
+                    // It should be later reset to emit code correctly.
 public:
   SDValue() = default;
   SDValue(SDNode *node, unsigned resno);
 
   /// get the index which selects a specific result in the SDNode
   unsigned getResNo() const { return ResNo; }
+
+  /// get the ValueID of this value
+  int getValueID() const { return ValueID; } 
+
+  /// set the ValueID of this value
+  void setValueID(int UniqueID) { ValueID = UniqueID; } 
+
+  /// reset the ValueID
+  void resetValueID() { ValueID = -1; }
 
   /// get the SDNode which holds the desired result
   SDNode *getNode() const { return Node; }
@@ -142,13 +153,13 @@ public:
   inline SDNode *operator->() const { return Node; }
 
   bool operator==(const SDValue &O) const {
-    return Node == O.Node && ResNo == O.ResNo;
+    return Node == O.Node && ResNo == O.ResNo && ValueID == O.ValueID;
   }
   bool operator!=(const SDValue &O) const {
     return !operator==(O);
   }
   bool operator<(const SDValue &O) const {
-    return std::tie(Node, ResNo) < std::tie(O.Node, O.ResNo);
+    return std::tie(Node, ResNo, ValueID) < std::tie(O.Node, O.ResNo, O.ValueID);
   }
   explicit operator bool() const {
     return Node != nullptr;
@@ -286,6 +297,8 @@ public:
   SDNode *getNode() const { return Val.getNode(); }
   /// Convenience function for get().getResNo().
   unsigned getResNo() const { return Val.getResNo(); }
+  /// Convenience function for get().getUniqueID().
+  int getValueID() const { return Val.getValueID(); }
   /// Convenience function for get().getValueType().
   EVT getValueType() const { return Val.getValueType(); }
 

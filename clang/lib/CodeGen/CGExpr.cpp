@@ -1821,6 +1821,25 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   // This should now return an array
   llvm::Value *Val = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
   
+  if (isBitFieldInUnion) {
+    if (Info.IsSigned) {
+      assert(static_cast<unsigned>(Info.Offset + Info.Size) <= Info.StorageSize);
+      unsigned HighBits = Info.StorageSize - Info.Offset - Info.Size;
+      if (HighBits)
+        Val = Builder.CreateShl(Val, HighBits, "bf.shl");
+      if (Info.Offset + HighBits)
+        Val = Builder.CreateAShr(Val, Info.Offset + HighBits, "bf.ashr");
+    } else {
+      if (Info.Offset)
+        Val = Builder.CreateLShr(Val, Info.Offset, "bf.lshr");
+      if (static_cast<unsigned>(Info.Offset) + Info.Size < Info.StorageSize)
+        Val = Builder.CreateAnd(Val, llvm::APInt::getLowBitsSet(Info.StorageSize,
+                                                                Info.Size),
+                                "bf.clear");
+    }
+    isBitFieldInUnion = false;
+  }
+
   Val = Builder.CreateIntCast(Val, ResLTy, Info.IsSigned, "bf.cast");
   EmitScalarRangeCheck(Val, LV.getType(), Loc);
   return RValue::get(Val);
@@ -2017,6 +2036,39 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
                                  /*IsSigned=*/false);
 
   llvm::Value *MaskedVal = SrcVal;
+
+  if (isBitFieldInUnion) {
+    // See if there are other bits in the bitfield's storage we'll need to load
+    // and mask together with source before storing.
+    if (Info.StorageSize != Info.Size) {
+      assert(Info.StorageSize > Info.Size && "Invalid bitfield size.");
+      llvm::Value *Val =
+        Builder.CreateLoad(Ptr, Dst.isVolatileQualified(), "bf.load");
+
+      // Mask the source value as needed.
+      if (!hasBooleanRepresentation(Dst.getType()))
+        SrcVal = Builder.CreateAnd(SrcVal,
+                                  llvm::APInt::getLowBitsSet(Info.StorageSize,
+                                                              Info.Size),
+                                  "bf.value");
+      MaskedVal = SrcVal;
+      if (Info.Offset)
+        SrcVal = Builder.CreateShl(SrcVal, Info.Offset, "bf.shl");
+
+      // Mask out the original value.
+      Val = Builder.CreateAnd(Val,
+                              ~llvm::APInt::getBitsSet(Info.StorageSize,
+                                                      Info.Offset,
+                                                      Info.Offset + Info.Size),
+                              "bf.clear");
+
+      // Or together the unchanged values and the source value.
+      SrcVal = Builder.CreateOr(Val, SrcVal, "bf.set");
+    } else {
+      assert(Info.Offset == 0);
+    }
+    isBitFieldInUnion = false;
+  }
 
   // Write the new value back out.
   Builder.CreateStore(SrcVal, Ptr, Dst.isVolatileQualified());
@@ -3832,15 +3884,25 @@ LValue CodeGenFunction::EmitLValueForField(LValue base,
     const CGBitFieldInfo &Info = RL.getBitFieldInfo(field);
     Address Addr = base.getAddress();
 
-	unsigned Idx = RL.getLLVMFieldNo(field);
+    unsigned Idx = RL.getLLVMFieldNo(field);
 
-	Addr = Builder.CreateStructGEP(Addr, Idx, Info.StorageOffset,
-                                     field->getName());
+    if (!field->getParent()->isUnion()) {
+      Addr = Builder.CreateStructGEP(Addr, Idx, Info.StorageOffset,
+                                          field->getName());
+    } else {
+      // Get the access type.
+      llvm::Type *FieldIntTy =
+        llvm::Type::getIntNTy(getLLVMContext(), Info.StorageSize);
+      if (Addr.getElementType() != FieldIntTy)
+        Addr = Builder.CreateElementBitCast(Addr, FieldIntTy);
+    }
 
     QualType fieldType =
       field->getType().withCVRQualifiers(base.getVRQualifiers());
     // TODO: Support TBAA for bit fields.
     LValueBaseInfo FieldBaseInfo(BaseInfo.getAlignmentSource());
+    if (field->getParent()->isUnion())
+      isBitFieldInUnion = true;
     return LValue::MakeBitfield(Addr, Info, fieldType, FieldBaseInfo,
                                 TBAAAccessInfo());
   }

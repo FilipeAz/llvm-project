@@ -78,12 +78,15 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 
     // Keep track of maximum alignment constraint.
     StructAlignment = std::max(TyAlign, StructAlignment);
-	MemberOffsets[i] = StructSize;
+	  MemberOffsets[i] = StructSize;
     StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
   }
 
   if (ST->isReallyPacked()) {
-    StructSize /= 8;
+    if (StructSize % 8 == 0)
+      StructSize /= 8;
+    else
+      StructSize = StructSize/8 + 1;
   }
 
   // Empty structures have alignment of 1 byte.
@@ -713,7 +716,7 @@ unsigned DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
 
   case Type::StructTyID: {
     // Packed structure types always have an ABI alignment of one.
-    if (cast<StructType>(Ty)->isPacked() && abi_or_pref)
+    if ((cast<StructType>(Ty)->isPacked() || cast<StructType>(Ty)->isReallyPacked()) && abi_or_pref)
       return 1;
 
     // Get the layout annotation... which is lazily created on demand.

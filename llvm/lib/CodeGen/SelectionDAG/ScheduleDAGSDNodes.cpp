@@ -32,7 +32,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
-
+#include <iostream>
 #define DEBUG_TYPE "pre-RA-sched"
 
 STATISTIC(LoadsClustered, "Number of loads clustered together");

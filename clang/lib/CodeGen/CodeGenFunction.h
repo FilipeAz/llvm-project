@@ -226,6 +226,7 @@ class CodeGenFunction : public CodeGenTypeCache {
   CodeGenFunction(const CodeGenFunction &) = delete;
   void operator=(const CodeGenFunction &) = delete;
 
+  bool isBitFieldInUnion = false;
   friend class CGCXXABI;
 public:
   /// A jump destination is an abstract label, branching to which may

@@ -95,6 +95,9 @@ class SelectionDAGBuilder {
 
   /// ReallyPackedStructMap - The really packed struct being visited by SDValue
   DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>> ReallyPackedStructMap;
+  /// Used to tell apart gep nodes that are identical because of bitfields stored
+  /// in the same word
+  int NodeUniqueID = 0;
 
   DenseMap<const Value*, SDValue> NodeMap;
 
@@ -694,6 +697,26 @@ public:
     if (NodeMap.find(V) == NodeMap.end())
       return nullptr;
     return NodeMap[V].getNode();
+  }
+
+  /// Return the information for the specified SDValue if it exists.
+  std::tuple<const StructLayout*, unsigned, uint64_t> *getInfoforSDValue(SDValue V) {
+    if (ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end())
+      return nullptr;
+    return &ReallyPackedStructMap[V];
+  }
+
+  void setSDValueInfo(SDValue V, const StructLayout *StrLay, unsigned Field, uint64_t Offset) {
+    assert((ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end()) && "Already set info for this node!");
+    ReallyPackedStructMap.insert(std::make_pair(V, std::make_tuple(StrLay, Field, Offset)));
+  }
+
+  void resetReallyPackedStructMap() {
+    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator i = ReallyPackedStructMap.begin();
+    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator e = ReallyPackedStructMap.end();
+    for(; i != e; i++) {
+      i->first.resetValueID();
+    }
   }
 
   SDValue getNonRegisterValue(const Value *V);

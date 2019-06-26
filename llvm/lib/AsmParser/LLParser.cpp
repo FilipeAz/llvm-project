@@ -3069,11 +3069,6 @@ bool LLParser::ParseValID(ValID &ID, PerFunctionState *PFS) {
     bool isReallyPackedStruct = EatIfPresent(lltok::lbrace);
 
     SmallVector<Constant*, 16> Elts;
-    if (ParseGlobalValueVector(Elts) ||
-        (isReallyPackedStruct &&
-         ParseToken(lltok::rbrace, "expected end of packed struct")) ||
-        ParseToken(lltok::rslash, "expected end of constant"))
-      return true;
 
     if (isReallyPackedStruct) {
       ID.ConstantStructElts = make_unique<Constant *[]>(Elts.size());

@@ -3091,6 +3091,9 @@ void SelectionDAGBuilder::visitTrunc(const User &I) {
 void SelectionDAGBuilder::visitZExt(const User &I) {
   // ZExt cannot be a no-op cast because sizeof(src) < sizeof(dest).
   // ZExt also can't be a cast to bool for same reason. So, nothing much to do
+  //std::cout << "zext actual size: " << I.getOperand(0)->getType()->getPrimitiveSizeInBits() << std::endl;
+  //std::cout << "zext newer size: " << I.getOperand(1)->getType()->getPrimitiveSizeInBits() << std::endl;
+  //std::cout << "zext I type size: " << I.getType()->getPrimitiveSizeInBits() << std::endl;
   SDValue N = getValue(I.getOperand(0));
   EVT DestVT = DAG.getTargetLoweringInfo().getValueType(DAG.getDataLayout(),
                                                         I.getType());
@@ -3557,17 +3560,48 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
 
         if (StrLay->isReallyPacked()) {
           N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
-                        DAG.getConstant(Offset/8, dl, N.getValueType()), Flags);
+                DAG.getConstant(Offset/8, dl, N.getValueType()), Flags);
+          
+          //std::cout << "gep offset: " << Offset << std::endl;
+          /*if (StTy->isFunctionTy())
           ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, Field, Offset)));
+          else*/
+          uint64_t bitFieldSize;
+
+          if (Field + 1 == StrLay->getNumElements())
+            bitFieldSize = StrLay->getSizeInBits() - Offset;
+          else 
+            bitFieldSize = StrLay->getElementOffset(Field + 1) - Offset;
+          if (bitFieldSize % 8 != 0) {
+            N.setValueID(NodeUniqueID);
+            NodeUniqueID++;
+            //std::cout << "uniqueid after changing: " << NodeUniqueID << std::endl;
+            //std::cout << "uniqueid after changing: " << N.getValueID() << std::endl;
+            //ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, Field, Offset)));
+            //std::cout << "gep pointer of node: " << N.getNode() << std::endl;
+            setSDValueInfo(N, StrLay, Field, Offset);
+            }
         } else {
           N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
-                        DAG.getConstant(Offset, dl, N.getValueType()), Flags);
+                DAG.getConstant(Offset, dl, N.getValueType()), Flags);
         }
-	  } else {
+	    } else {
         const StructLayout *StrLay = DL->getStructLayout(StTy);
         if (StrLay->isReallyPacked()) {
-          ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, 0, 0)));
-		}
+          uint64_t bitFieldSize;
+          if (Field + 1 == StrLay->getNumElements())
+            bitFieldSize = StrLay->getSizeInBits();
+          else 
+            bitFieldSize = StrLay->getElementOffset(Field + 1);
+
+          if (bitFieldSize % 8 != 0) {
+            N.setValueID(NodeUniqueID);
+            NodeUniqueID++;
+            //std::cout << "gep: " << N.getNode()->getOpcode() << std::endl;
+            //ReallyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, 0, 0)));
+            setSDValueInfo(N, StrLay, 0, 0);
+          }
+		    }
       }
     } else {
       unsigned IdxSize = DAG.getDataLayout().getIndexSizeInBits(AS);
@@ -3631,7 +3665,7 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
                       N.getValueType(), N, IdxN);
     }
   }
-
+//std::cout << "in gep opcode: " << N.getNode()->getOpcode() << std::endl;
   setValue(&I, N);
 }
 
@@ -3685,7 +3719,7 @@ void SelectionDAGBuilder::visitAlloca(const AllocaInst &I) {
   SDValue DSA = DAG.getNode(ISD::DYNAMIC_STACKALLOC, dl, VTs, Ops);
   setValue(&I, DSA);
   DAG.setRoot(DSA.getValue(1));
-
+//std::cout << "in alloca opcode: " << DSA.getNode()->getOpcode() << std::endl;
   assert(FuncInfo.MF->getFrameInfo().hasVarSizedObjects());
 }
 
@@ -3710,7 +3744,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
   }
 
   SDValue Ptr = getValue(SV);
-
+//std::cout << "ptr on load node type: " << Ptr.getNode()->getOpcode() << std::endl;
   Type *Ty = I.getType();
 
   bool isVolatile = I.isVolatile();
@@ -3780,6 +3814,8 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
                             PtrVT, Ptr,
                             DAG.getConstant(Offsets[i], dl, PtrVT),
                             Flags);
+                            //std::cout << "on the load A node type: " << A.getNode()->getOpcode() << std::endl;
+                            //std::cout << "load A offsets: " << Offsets[i] << std::endl;
     auto MMOFlags = MachineMemOperand::MONone;
     if (isVolatile)
       MMOFlags |= MachineMemOperand::MOVolatile;
@@ -3792,12 +3828,18 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
     MMOFlags |= TLI.getMMOFlags(I);
 
     // Find the info of the bitfield
-    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
-
-    if (iter != ReallyPackedStructMap.end()) {
-      const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
+    //DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
+    //std::cout << "ptr valueid: " << Ptr.getValueID() << std::endl;
+    //if (iter != ReallyPackedStructMap.end()) {
+    std::tuple<const StructLayout*, unsigned, uint64_t> *Info = getInfoforSDValue(Ptr);
+    if (Info != nullptr) {
+      //std::cout << "bitfield load" << std::endl;
+      /*const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
       unsigned Field = std::get<1>(ReallyPackedStructMap[Ptr]);
-      uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);
+      uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);*/
+      const StructLayout *StrLay = std::get<0>(*Info);
+      unsigned Field = std::get<1>(*Info);
+      uint64_t Offset = std::get<2>(*Info);
       uint64_t bitFieldSize;
       uint16_t loadSize;
 
@@ -3822,31 +3864,67 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
         else
           loadSize = (bitFieldSize / 8) + 1;
       }
+      //std::cout << "load sizes: " << loadSize * 8 << " " << bitFieldSize << std::endl;
+      //std::cout << "actual field size: " << SV->getType()->getPrimitiveSizeInBits() << std::endl;
+      //std::cout << "load id found: " << Ptr.getValueID() << std::endl;
 
-      Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
-      static EVT PtrTy = EVT::getEVT(loadType);
 
-      // Load the minimum amount of bytes needed
-      SDValue L = DAG.getLoad(PtrTy, dl, Root, A,
-                            MachinePointerInfo(SV, Offsets[i]), Alignment,
-                            MMOFlags, AAInfo, Ranges);
+      if (loadSize * 8 == bitFieldSize) {
+        SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, A,
+                                MachinePointerInfo(SV, Offsets[i]), Alignment,
+                                MMOFlags, AAInfo, Ranges);
+//std::cout << "in load opcode: " << L.getNode()->getOpcode() << std::endl;
+        Values[i] = L;
+        Chains[ChainI] = L.getValue(1);
+      } else {
 
-      uint64_t inWordOffset = Offset - (Offset/8)*8;
-      // Shift the word loaded until the bitfield we want to read starts at the 0 bit
-      SDValue Shr = DAG.getNode(ISD::SRL, dl, PtrTy, L, DAG.getConstant(inWordOffset, dl, PtrTy),  
-                                      Flags);
-      
-      // And out the rest
-      SDValue And = DAG.getNode(ISD::AND, dl, Shr.getValueType(),
-                                      Shr, DAG.getConstant(llvm::APInt::getLowBitsSet(loadSize * 8, bitFieldSize), 
-                                      dl, Shr.getValueType()), Flags);
+        Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
+        EVT PtrTy = EVT::getEVT(loadType);
 
-      // Extend to the right type
-      SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, PtrTy, And, DAG.getConstant(loadSize * 8, dl, And.getValueType()),  
-                                      Flags);
+        // Load the minimum amount of bytes needed
+        SDValue L = DAG.getLoad(PtrTy, dl, Root, A,
+                              MachinePointerInfo(SV, Offsets[i]), Alignment,
+                              MMOFlags, AAInfo, Ranges);
 
-      Values[i] = Zext;
-      Chains[ChainI] = Zext.getValue(0);
+        //SDValue L = DAG.getLoad(PtrTy, dl, Root, Ptr/*A*/, MachinePointerInfo(SV));
+  //std::cout << "on the store l node type: " << L.getNode()->getOpcode() << std::endl;
+        uint64_t inWordOffset = Offset - (Offset/8)*8;
+
+        //SDValue Shr = L;
+
+        // Shift the word loaded until the bitfield we want to read starts at the 0 bit
+        //if (inWordOffset != 0)
+        SDValue Shr = DAG.getNode(ISD::SRL, dl, EVT::getEVT(loadType), L, DAG.getConstant(inWordOffset, dl, 
+                                          EVT::getEVT(loadType)), Flags);
+        //std::cout << "on the store Shr node type: " << Shr.getNode()->getOpcode() << std::endl;
+        // And out the rest
+        //std::cout << "load size and bitfeilds size: " << loadSize * 8 << " " << bitFieldSize << std::endl;
+        SDValue And = DAG.getNode(ISD::AND, dl, EVT::getEVT(loadType),
+                                        Shr, DAG.getConstant(llvm::APInt::getLowBitsSet(loadSize * 8, bitFieldSize), 
+                                        dl, EVT::getEVT(loadType)), Flags);
+  //std::cout << "on the load And node type: " << And.getNode()->getOpcode() << std::endl;
+        // Extend to the right type
+        //SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, PtrTy, And, DAG.getConstant(loadSize * 8, dl, And.getValueType()),  
+        //                                Flags);
+
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, dl, EVT::getEVT(loadType), And, DAG.getConstant(bitFieldSize, dl, 
+                                          EVT::getEVT(IntegerType::get(*DAG.getContext(), bitFieldSize))), Flags);
+
+        Values[i] = Trunc;
+        Chains[ChainI] = L.getValue(1);
+
+        /*if (!ConstantMemory) {
+          //SDValue Chain = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
+          //                            makeArrayRef(Chains.data(), ChainI));
+          if (isVolatile)
+            DAG.setRoot(And);
+          //else
+          //  PendingLoads.push_back(Chain);
+        }
+
+        setValue(&I, And);
+        return;*/
+      }
     }
     else {
       SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, A,
@@ -4001,12 +4079,19 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
                               DAG.getConstant(Offsets[i], dl, PtrVT), Flags);
   
     // Find the info of the bitfield
-    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
-
-    if (iter != ReallyPackedStructMap.end()) {
-      const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
+    //DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
+    
+    //if (iter != ReallyPackedStructMap.end()) {
+      //std::cout << "store pointer: " << Ptr.getNode() << std::endl;
+    std::tuple<const StructLayout*, unsigned, uint64_t> *Info = getInfoforSDValue(Ptr);
+    if (Info != nullptr) {
+      //std::cout << "bitfield store" << std::endl;
+      /*const StructLayout *StrLay = std::get<0>(ReallyPackedStructMap[Ptr]);
       unsigned Field = std::get<1>(ReallyPackedStructMap[Ptr]);
-      uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);
+      uint64_t Offset = std::get<2>(ReallyPackedStructMap[Ptr]);*/
+      const StructLayout *StrLay = std::get<0>(*Info);
+      unsigned Field = std::get<1>(*Info);
+      uint64_t Offset = std::get<2>(*Info);
       uint64_t bitFieldSize;
       uint16_t loadSize;
 
@@ -4031,50 +4116,64 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
         else
           loadSize = (bitFieldSize / 8) + 1;
       }
+      //std::cout << "store sizes: " << loadSize * 8 << " " << bitFieldSize << std::endl;
+      //std::cout << "store id found: " << Ptr.getValueID() << std::endl;
+      if (loadSize * 8 == bitFieldSize) {
+        SDValue St = DAG.getStore(
+            Root, dl, SDValue(Src.getNode(), Src.getResNo() + i), Add,
+            MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
+//std::cout << "on the store node type: " << St.getNode()->getOpcode() << std::endl;
+        Chains[ChainI] = St;
+      } else {
+        Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
+        EVT PtrTy = EVT::getEVT(loadType);
 
-      Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
-      static EVT PtrTy = EVT::getEVT(loadType);
-
-      // Loaded the minimum amount of bytes needed
-      SDValue Load = DAG.getLoad(PtrTy, dl, Root, Ptr, MachinePointerInfo(PtrV));
-
-      uint64_t inWordOffset = Offset - (Offset/8)*8;
-      
-      // And out the previous value stored at the bitfield
-      SDValue And = DAG.getNode(ISD::AND, dl, PtrTy,
-                                      Load, DAG.getConstant(~llvm::APInt::getBitsSet(loadSize * 8, inWordOffset, 
-                                      inWordOffset + bitFieldSize), dl, PtrTy), Flags);
-
-      // Extend the value we want to store to the size of the Loaded value to be able to combine
-      // the values afterwards
-      SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, PtrTy, Src, DAG.getConstant(loadSize * 8, dl, PtrTy),  
-                                      Flags);
-
-      // Shift the extended value to the offset of the bitfield we want to store it in
-      SDValue Shl = DAG.getNode(ISD::SHL, dl, PtrTy, Zext, DAG.getConstant(inWordOffset, dl, PtrTy),  
-                                      Flags);
-
-      // Combine both the word and the value we want to store
-      SDValue Or = DAG.getNode(ISD::OR, dl, PtrTy, And, Shl, Flags);
-
-      // Finally store the entire word that was loaded at the beggining
-      SDValue St = DAG.getStore(
-          Root, dl, Or, Add,
-          MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
-      
-      Chains[ChainI] = St;
+        // Loaded the minimum amount of bytes needed
+        SDValue Load = DAG.getLoad(PtrTy, dl, Root, /*Ptr*/Add, MachinePointerInfo(PtrV));
+  //std::cout << "on the store load node type: " << Load.getNode()->getOpcode() << std::endl;
+        uint64_t inWordOffset = Offset - (Offset/8)*8;
+        
+        // And out the previous value stored at the bitfield
+        SDValue And = DAG.getNode(ISD::AND, dl, EVT::getEVT(loadType),
+                                        Load, DAG.getConstant(~llvm::APInt::getBitsSet(loadSize * 8, inWordOffset, 
+                                        inWordOffset + bitFieldSize), dl, EVT::getEVT(loadType)), Flags);
+  //std::cout << "on the store and node type: " << And.getNode()->getOpcode() << std::endl;
+        // Extend the value we want to store to the size of the Loaded value to be able to combine
+        // the values afterwards
+        SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, EVT::getEVT(loadType), Src, DAG.getConstant(loadSize * 8, dl, PtrTy),  
+                                        Flags);
+  //std::cout << "on the store zext node type: " << Zext.getNode()->getOpcode() << std::endl;
+        //SDValue Shl = Zext;
+        // Shift the extended value to the offset of the bitfield we want to store it in
+        //if (inWordOffset != 0)
+        SDValue Shl = DAG.getNode(ISD::SHL, dl, EVT::getEVT(loadType), Zext, DAG.getConstant(inWordOffset, dl, 
+                                          EVT::getEVT(loadType)), Flags);
+  //std::cout << "on the store shl node type: " << Shl.getNode()->getOpcode() << std::endl;
+        // Combine both the word and the value we want to store
+        SDValue Or = DAG.getNode(ISD::OR, dl, EVT::getEVT(loadType), And, Shl, Flags);
+  //std::cout << "on the store or node type: " << Or.getNode()->getOpcode() << std::endl;
+        // Finally store the entire word that was loaded at the beggining
+        SDValue St = DAG.getStore(
+            Root, dl, Or, Add,
+            MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
+        //std::cout << "on the store st node type: " << St.getNode()->getOpcode() << std::endl;
+        
+        Chains[ChainI] = St;  
+        
+      }
     }
     else {
       SDValue St = DAG.getStore(
           Root, dl, SDValue(Src.getNode(), Src.getResNo() + i), Add,
           MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
-
+//std::cout << "in store opcode: " << St.getNode()->getOpcode() << std::endl;
       Chains[ChainI] = St;
     }
   } 
 
   SDValue StoreNode = DAG.getNode(ISD::TokenFactor, dl, MVT::Other,
                                   makeArrayRef(Chains.data(), ChainI));  
+                                  //std::cout << "in store opcode: " << StoreNode.getNode()->getOpcode() << std::endl;
   DAG.setRoot(StoreNode);
   
 }

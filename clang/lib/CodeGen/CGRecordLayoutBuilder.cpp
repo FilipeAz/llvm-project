@@ -941,7 +941,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     // Finally set the body of the struct with the newly calculated bitfield storage
     Ty->setBody(/*Builder.FieldTypes*/newFieldTypes, Builder.Packed, true);
   } else {
-	Ty->setBody(Builder.FieldTypes, Builder.Packed);  
+	  Ty->setBody(Builder.FieldTypes, Builder.Packed);  
   }
 
   CGRecordLayout *RL =
