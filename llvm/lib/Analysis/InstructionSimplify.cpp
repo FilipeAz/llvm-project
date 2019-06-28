@@ -3993,6 +3993,29 @@ static Value *simplifySelectWithFCmp(Value *Cond, Value *T, Value *F) {
 /// If not, this returns null.
 static Value *SimplifySelectInst(Value *Cond, Value *TrueVal, Value *FalseVal,
                                  const SimplifyQuery &Q, unsigned MaxRecurse) {
+  if (isa<PoisonValue>(Cond))   // If the condition is poison we should return poison
+    return Cond;
+  
+  if (isa<PoisonValue>(TrueVal))   // select ?, poison, X -> X
+    return FalseVal;
+  if (isa<PoisonValue>(FalseVal))   // select ?, X, poison -> X
+    return TrueVal;
+  
+  if (auto *CondC = dyn_cast<Constant>(Cond))
+    // select undef, X, Y -> X or Y
+    if (isa<UndefValue>(CondC))
+      return isa<Constant>(FalseVal) ? FalseVal : TrueVal;
+
+  if (isa<UndefValue>(TrueVal))   // select ?, undef, X -> X
+    return FalseVal;
+  if (isa<UndefValue>(FalseVal))   // select ?, X, undef -> X
+    return TrueVal;
+  
+  // If we cannot guarantee that neither operand is not poison/undef we should not simplify.
+  if (!isGuaranteedNotToBeUndefOrPoison(Cond) && !isGuaranteedNotToBeUndefOrPoison(TrueVal)
+      && !isGuaranteedNotToBeUndefOrPoison(FalseVal))
+    return nullptr;
+
   if (auto *CondC = dyn_cast<Constant>(Cond)) {
     if (auto *TrueC = dyn_cast<Constant>(TrueVal))
       if (auto *FalseC = dyn_cast<Constant>(FalseVal))
@@ -4016,11 +4039,11 @@ static Value *SimplifySelectInst(Value *Cond, Value *TrueVal, Value *FalseVal,
   if (TrueVal == FalseVal)
     return TrueVal;
 
-  if (isa<UndefValue>(TrueVal))   // select ?, undef, X -> X
+  /*if (isa<UndefValue>(TrueVal))   // select ?, undef, X -> X
     return FalseVal;
   if (isa<UndefValue>(FalseVal))   // select ?, X, undef -> X
     return TrueVal;
-
+  */
   if (Value *V =
           simplifySelectWithICmpCond(Cond, TrueVal, FalseVal, Q, MaxRecurse))
     return V;

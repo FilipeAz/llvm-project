@@ -945,6 +945,10 @@ void LoopUnswitch::EmitPreheaderBranchOnCondition(Value *LIC, Constant *Val,
     Swapped = true;
   }
 
+  // Freeze the condition of the Branch
+  // Not sure if we need the insertbefore part....
+  BranchVal = new FreezeInst(BranchVal, "", OldBranch);
+
   // Old branch will be removed, so save its parent and successor to update the
   // DomTree.
   auto *OldBranchSucc = OldBranch->getSuccessor(0);

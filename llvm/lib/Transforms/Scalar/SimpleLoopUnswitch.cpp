@@ -363,6 +363,7 @@ static bool unswitchTrivialBranch(Loop &L, BranchInst &BI, DominatorTree &DT,
   bool FullUnswitch = false;
 
   if (L.isLoopInvariant(BI.getCondition())) {
+    BI.setCondition(new FreezeInst(BI.getCondition(), "", &BI));
     Invariants.push_back(BI.getCondition());
     FullUnswitch = true;
   } else {
@@ -665,6 +666,9 @@ static bool unswitchTrivialSwitch(Loop &L, SwitchInst &SI, DominatorTree &DT,
   BasicBlock *OldPH = L.getLoopPreheader();
   BasicBlock *NewPH = SplitEdge(OldPH, L.getHeader(), &DT, &LI, MSSAU);
   OldPH->getTerminator()->eraseFromParent();
+
+  // Freeze the LoopCond in case it's poison
+  LoopCond = new FreezeInst( LoopCond, "", NewPH);
 
   // Now add the unswitched switch.
   auto *NewSI = SwitchInst::Create(LoopCond, NewPH, ExitCases.size(), OldPH);
