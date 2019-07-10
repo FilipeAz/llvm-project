@@ -119,7 +119,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
+#include <iostream>
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1076,7 +1076,7 @@ void SelectionDAGBuilder::visit(const Instruction &I) {
   CurInst = &I;
 
   visit(I.getOpcode(), I);
-
+  //std::cout << "opcode: " << I.getOpcode() << std::endl;
   if (auto *FPMO = dyn_cast<FPMathOperator>(&I)) {
     // Propagate the fast-math-flags of this IR instruction to the DAG node that
     // maps to this instruction.
@@ -3842,7 +3842,9 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
       uint64_t Offset = std::get<2>(*Info);
       uint64_t bitFieldSize;
       uint16_t loadSize;
-
+//ReallyPackedStructMap.erase(ReallyPackedStructMap.find_as(Ptr));
+//std::cout << "load ptr id: " << Ptr.getValueID() << std::endl;
+      //Ptr.setValueID(-1);
       if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -4080,7 +4082,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   
     // Find the info of the bitfield
     //DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ReallyPackedStructMap.find_as(Ptr);
-    
+    //std::cout << "im in store " << std::endl;
     //if (iter != ReallyPackedStructMap.end()) {
       //std::cout << "store pointer: " << Ptr.getNode() << std::endl;
     std::tuple<const StructLayout*, unsigned, uint64_t> *Info = getInfoforSDValue(Ptr);
@@ -4094,7 +4096,9 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       uint64_t Offset = std::get<2>(*Info);
       uint64_t bitFieldSize;
       uint16_t loadSize;
-
+//ReallyPackedStructMap.erase(ReallyPackedStructMap.find_as(Ptr));
+//std::cout << "st ptr id: " << Ptr.getValueID() << std::endl;
+      //Ptr.setValueID(-1);
       if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -4127,12 +4131,12 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       } else {
         Type *loadType = IntegerType::get(*DAG.getContext(), loadSize * 8);
         EVT PtrTy = EVT::getEVT(loadType);
-
+//std::cout << "load size: " << loadSize * 8 << std::endl;
         // Loaded the minimum amount of bytes needed
         SDValue Load = DAG.getLoad(PtrTy, dl, Root, /*Ptr*/Add, MachinePointerInfo(PtrV));
   //std::cout << "on the store load node type: " << Load.getNode()->getOpcode() << std::endl;
         uint64_t inWordOffset = Offset - (Offset/8)*8;
-        
+        //std::cout << "inwordoffset: " << inWordOffset << std::endl;
         // And out the previous value stored at the bitfield
         SDValue And = DAG.getNode(ISD::AND, dl, EVT::getEVT(loadType),
                                         Load, DAG.getConstant(~llvm::APInt::getBitsSet(loadSize * 8, inWordOffset, 
@@ -4175,7 +4179,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
                                   makeArrayRef(Chains.data(), ChainI));  
                                   //std::cout << "in store opcode: " << StoreNode.getNode()->getOpcode() << std::endl;
   DAG.setRoot(StoreNode);
-  
+  //std::cout << "i ended store" << std::endl;
 }
 
 void SelectionDAGBuilder::visitMaskedStore(const CallInst &I,

@@ -87,6 +87,8 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
       StructSize /= 8;
     else
       StructSize = StructSize/8 + 1;
+    StructAlignment = StructSize;
+    return;
   }
 
   // Empty structures have alignment of 1 byte.

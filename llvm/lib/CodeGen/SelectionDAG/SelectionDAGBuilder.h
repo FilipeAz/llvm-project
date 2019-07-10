@@ -707,7 +707,7 @@ public:
   }
 
   void setSDValueInfo(SDValue V, const StructLayout *StrLay, unsigned Field, uint64_t Offset) {
-    assert((ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end()) && "Already set info for this node!");
+    //assert((ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end()) && "Already set info for this node!");
     ReallyPackedStructMap.insert(std::make_pair(V, std::make_tuple(StrLay, Field, Offset)));
   }
 
@@ -716,6 +716,7 @@ public:
     DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator e = ReallyPackedStructMap.end();
     for(; i != e; i++) {
       i->first.resetValueID();
+      ReallyPackedStructMap.erase(i);
     }
   }
 

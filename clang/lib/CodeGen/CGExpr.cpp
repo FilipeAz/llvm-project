@@ -2067,7 +2067,6 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
     } else {
       assert(Info.Offset == 0);
     }
-    isBitFieldInUnion = false;
   }
 
   // Write the new value back out.
@@ -2078,20 +2077,23 @@ void CodeGenFunction::EmitStoreThroughBitfieldLValue(RValue Src, LValue Dst,
   if (Result) {
     llvm::Value *ResultVal = MaskedVal;
 
-    // Sign extend the value if needed.
-    if (Info.IsSigned) {
-      assert(Info.Size <= Info.StorageSize);
-      unsigned HighBits = Info.StorageSize - Info.Size;
-      if (HighBits) {
-        ResultVal = Builder.CreateShl(ResultVal, HighBits, "bf.result.shl");
-        ResultVal = Builder.CreateAShr(ResultVal, HighBits, "bf.result.ashr");
+    if (isBitFieldInUnion) {
+      // Sign extend the value if needed.
+      if (Info.IsSigned) {
+        assert(Info.Size <= Info.StorageSize);
+        unsigned HighBits = Info.StorageSize - Info.Size;
+        if (HighBits) {
+          ResultVal = Builder.CreateShl(ResultVal, HighBits, "bf.result.shl");
+          ResultVal = Builder.CreateAShr(ResultVal, HighBits, "bf.result.ashr");
+        }
       }
-    }
 
-    ResultVal = Builder.CreateIntCast(ResultVal, ResLTy, Info.IsSigned,
-                                      "bf.result.cast");
+      ResultVal = Builder.CreateIntCast(ResultVal, ResLTy, Info.IsSigned,
+                                        "bf.result.cast");
+    }
     *Result = EmitFromMemory(ResultVal, Dst.getType());
   }
+  isBitFieldInUnion = false;
 }
 
 void CodeGenFunction::EmitStoreThroughExtVectorComponentLValue(RValue Src,
