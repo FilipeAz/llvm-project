@@ -891,28 +891,53 @@ void ModuleBitcodeWriter::writeTypeTable() {
     }
     case Type::StructTyID: {
       StructType *ST = cast<StructType>(T);
-      // STRUCT: [ispacked, eltty x N]
-      TypeVals.push_back(ST->isPacked());
-      // Output all of the element types.
-      for (StructType::element_iterator I = ST->element_begin(),
-           E = ST->element_end(); I != E; ++I)
-        TypeVals.push_back(VE.getTypeID(*I));
+      if (ST->isReallyPacked()) {
+        // REALLY_PACKED_STRUCT: [eltty x N]
+        // Output all of the element types.
+        for (StructType::element_iterator I = ST->element_begin(),
+            E = ST->element_end(); I != E; ++I)
+          TypeVals.push_back(VE.getTypeID(*I));
 
-      if (ST->isLiteral()) {
-        Code = bitc::TYPE_CODE_STRUCT_ANON;
-        AbbrevToUse = StructAnonAbbrev;
-      } else {
-        if (ST->isOpaque()) {
-          Code = bitc::TYPE_CODE_OPAQUE;
+        if (ST->isLiteral()) {
+          Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_ANON;
+          AbbrevToUse = StructAnonAbbrev;
         } else {
-          Code = bitc::TYPE_CODE_STRUCT_NAMED;
-          AbbrevToUse = StructNamedAbbrev;
-        }
+          if (ST->isOpaque()) {
+            Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_OPAQUE;
+          } else {
+            Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_NAMED;
+            AbbrevToUse = StructNamedAbbrev;
+          }
 
-        // Emit the name if it is present.
-        if (!ST->getName().empty())
-          writeStringRecord(Stream, bitc::TYPE_CODE_STRUCT_NAME, ST->getName(),
-                            StructNameAbbrev);
+          // Emit the name if it is present.
+          if (!ST->getName().empty())
+            writeStringRecord(Stream, bitc::TYPE_CODE_STRUCT_NAME, ST->getName(),
+                              StructNameAbbrev);
+        }
+      } else {
+        // STRUCT: [ispacked, eltty x N]
+        TypeVals.push_back(ST->isPacked());
+        // Output all of the element types.
+        for (StructType::element_iterator I = ST->element_begin(),
+            E = ST->element_end(); I != E; ++I)
+          TypeVals.push_back(VE.getTypeID(*I));
+
+        if (ST->isLiteral()) {
+          Code = bitc::TYPE_CODE_STRUCT_ANON;
+          AbbrevToUse = StructAnonAbbrev;
+        } else {
+          if (ST->isOpaque()) {
+            Code = bitc::TYPE_CODE_OPAQUE;
+          } else {
+            Code = bitc::TYPE_CODE_STRUCT_NAMED;
+            AbbrevToUse = StructNamedAbbrev;
+          }
+
+          // Emit the name if it is present.
+          if (!ST->getName().empty())
+            writeStringRecord(Stream, bitc::TYPE_CODE_STRUCT_NAME, ST->getName(),
+                              StructNameAbbrev);
+        }
       }
       break;
     }

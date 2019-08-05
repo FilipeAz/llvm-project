@@ -1693,6 +1693,19 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = StructType::get(Context, EltTys, Record[0]);
       break;
     }
+    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_ANON: {  // REALLY_PACKED_STRUCT_ANON: [eltty x N]
+      SmallVector<Type*, 8> EltTys;
+      for (unsigned i = 0, e = Record.size(); i != e; ++i) {
+        if (Type *T = getTypeByID(Record[i]))
+          EltTys.push_back(T);
+        else
+          break;
+      }
+      if (EltTys.size() != Record.size())
+        return error("Invalid type");
+      ResultTy = StructType::get(Context, EltTys, false, true);
+      break;
+    }
     case bitc::TYPE_CODE_STRUCT_NAME:   // STRUCT_NAME: [strchr x N]
       if (convertToString(Record, 0, TypeName))
         return error("Invalid record");
@@ -1727,8 +1740,52 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = Res;
       break;
     }
+    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_NAMED: { // REALLY_PACKED_STRUCT_NAMED: [eltty x N]
+      if (NumRecords >= TypeList.size())
+        return error("Invalid TYPE table");
+
+      // Check to see if this was forward referenced, if so fill in the temp.
+      StructType *Res = cast_or_null<StructType>(TypeList[NumRecords]);
+      if (Res) {
+        Res->setName(TypeName);
+        TypeList[NumRecords] = nullptr;
+      } else  // Otherwise, create a new struct.
+        Res = createIdentifiedStructType(Context, TypeName);
+      TypeName.clear();
+
+      SmallVector<Type*, 8> EltTys;
+      for (unsigned i = 0, e = Record.size(); i != e; ++i) {
+        if (Type *T = getTypeByID(Record[i]))
+          EltTys.push_back(T);
+        else
+          break;
+      }
+      if (EltTys.size() != Record.size())
+        return error("Invalid record");
+      Res->setBody(EltTys, false, true);
+      ResultTy = Res;
+      break;
+    }
     case bitc::TYPE_CODE_OPAQUE: {       // OPAQUE: []
       if (Record.size() != 1)
+        return error("Invalid record");
+
+      if (NumRecords >= TypeList.size())
+        return error("Invalid TYPE table");
+
+      // Check to see if this was forward referenced, if so fill in the temp.
+      StructType *Res = cast_or_null<StructType>(TypeList[NumRecords]);
+      if (Res) {
+        Res->setName(TypeName);
+        TypeList[NumRecords] = nullptr;
+      } else  // Otherwise, create a new struct with no body.
+        Res = createIdentifiedStructType(Context, TypeName);
+      TypeName.clear();
+      ResultTy = Res;
+      break;
+    }
+    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_OPAQUE: {  // REALLY_PACKED_STRUCT_OPAQUE: []
+      if (Record.size() != 0)
         return error("Invalid record");
 
       if (NumRecords >= TypeList.size())

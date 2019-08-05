@@ -767,7 +767,16 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
   // Vector to where the bitfield sizes will be stored
   SmallVector<llvm::Type *, 16> newFieldTypes;
 
-  if(!Builder.BitFields.empty() && !D->isUnion()) {
+  // If all the fields are no named bitfields there is no reason to do all the complicated math
+  bool NoNamedBitFields = true;
+  llvm::DenseMap<const FieldDecl *, unsigned>::iterator fieldsIterator = Builder.Fields.begin();
+  for (; fieldsIterator != Builder.Fields.end(); fieldsIterator++) {
+    if (fieldsIterator->first->getIdentifier() != nullptr)
+      NoNamedBitFields = false;
+  }
+
+
+  if(!Builder.BitFields.empty() && !D->isUnion() && !NoNamedBitFields) {
 
     // First we need to find out how many bits are actually needed (padding and everything) 
     // to safely store this struct
@@ -795,7 +804,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       FieldsDeclVector[index] = std::make_pair(fieldsIterator->first, fieldsIterator->second);
       fieldsIterator++;
     }
-    
+
     // Sort by order of declaration
     std::sort(FieldsDeclVector, FieldsDeclVector + Builder.Fields.size(), wayToSortFieldsDecl);
     
@@ -856,8 +865,8 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     for(unsigned int index = 1; index < Builder.BitFields.size(); index++) {
       // If the offset is != 0 we update the amount of bits inserted that belonged to the previous word
       if(OrderedBitFields[index].second.Offset != 0) {
-		if (OrderedBitFields[index].second.Size == 0)
-          continue;
+        if (OrderedBitFields[index].second.Size == 0)
+              continue;
         newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), OrderedBitFields[index].second.Size));
         newFields.insert(std::make_pair(OrderedBitFields[index].first, newFieldsIndex));
         newFieldsIndex++;
@@ -877,26 +886,28 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
         for(int c = FieldsDeclVector[fieldDeclIter].second - fieldTypesIndex; c > 0; c--) {
           newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
           fieldTypesIndex++;
+          newFields.insert(std::make_pair(nullptr, newFieldsIndex));
+          newFieldsIndex++;
         }
         // Again, insert the regular struct fields until we find another bitfield declaration
         while(FieldsDeclVector[fieldDeclIter].first != OrderedBitFields[index].first) {
-		  if (OrderedBitFields[index].second.Size == 0) {
-            index++;
-            continue;
-          }
+          if (OrderedBitFields[index].second.Size == 0) {
+                index++;
+                continue;
+              }
+              newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
+              newFields.insert(std::make_pair(FieldsDeclVector[fieldDeclIter].first, newFieldsIndex));
+              newFieldsIndex++;
+              fieldTypesIndex++;
+              fieldDeclIter++;
+          // In case packing is explicit in the non bitfield portion of the struct because of the ReallyPacked type
+          for(; fieldTypesIndex < FieldsDeclVector[fieldDeclIter].second; fieldTypesIndex++) {
           newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
-          newFields.insert(std::make_pair(FieldsDeclVector[fieldDeclIter].first, newFieldsIndex));
+          newFields.insert(std::make_pair(nullptr, newFieldsIndex));
           newFieldsIndex++;
-          fieldTypesIndex++;
-          fieldDeclIter++;
-		  // In case packing is explicit in the non bitfield portion of the struct because of the ReallyPacked type
-		  for(; fieldTypesIndex < FieldsDeclVector[fieldDeclIter].second; fieldTypesIndex++) {
-			newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
-			newFields.insert(std::make_pair(nullptr, newFieldsIndex));
-			newFieldsIndex++;
-		  }
+          }
         }
-		// We also do this outside in case there are no regular fields in the struct
+		    // We also do this outside in case there are no regular fields in the struct
         for(; fieldTypesIndex < FieldsDeclVector[fieldDeclIter].second; fieldTypesIndex++) {
           newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
           newFields.insert(std::make_pair(nullptr, newFieldsIndex));
@@ -915,6 +926,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
         newFieldsIndex++;
         fieldDeclIter++;
       }
+      currentBitField++;
     }
     
     // If there are any leftover bits after the last bitfield, insert them here
@@ -939,7 +951,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
     }
 
     // Finally set the body of the struct with the newly calculated bitfield storage
-    Ty->setBody(/*Builder.FieldTypes*/newFieldTypes, Builder.Packed, true);
+    Ty->setBody(newFieldTypes, false, true);
   } else {
 	  Ty->setBody(Builder.FieldTypes, Builder.Packed);  
   }

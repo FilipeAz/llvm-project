@@ -2289,7 +2289,7 @@ bool LLParser::ParseType(Type *&Result, const Twine &Msg, bool AllowVoid) {
     Lex.Lex();
     if (Lex.getKind() == lltok::lbrace) {
       if (ParseAnonStructType(Result, false, true) ||
-          ParseToken(lltok::rslash, "expected '/' at end of packed struct"))
+          ParseToken(lltok::rslash, "expected '/' at end of really packed struct"))
         return true;
     } 
     break;
@@ -3070,6 +3070,12 @@ bool LLParser::ParseValID(ValID &ID, PerFunctionState *PFS) {
 
     SmallVector<Constant*, 16> Elts;
 
+    if (ParseGlobalValueVector(Elts) ||
+        (isReallyPackedStruct &&
+         ParseToken(lltok::rbrace, "expected end of really packed struct")) ||
+        ParseToken(lltok::rslash, "expected end of constant"))
+      return true;
+
     if (isReallyPackedStruct) {
       ID.ConstantStructElts = make_unique<Constant *[]>(Elts.size());
       memcpy(ID.ConstantStructElts.get(), Elts.data(),
@@ -3628,6 +3634,7 @@ bool LLParser::ParseGlobalValueVector(SmallVectorImpl<Constant *> &Elts,
   if (Lex.getKind() == lltok::rbrace ||
       Lex.getKind() == lltok::rsquare ||
       Lex.getKind() == lltok::greater ||
+      Lex.getKind() == lltok::rslash ||
       Lex.getKind() == lltok::rparen)
     return false;
 

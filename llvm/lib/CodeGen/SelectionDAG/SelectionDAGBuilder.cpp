@@ -2860,7 +2860,14 @@ void SelectionDAGBuilder::visitBinary(const User &I, unsigned Opcode) {
     Flags.setVectorReduction(true);
     LLVM_DEBUG(dbgs() << "Detected a reduction operation:" << I << "\n");
   }
-  
+  /*if (Opcode == ISD::XOR) {
+    std::cout << "im a xor" << std::endl;
+    if (I.getOperand(0)->getType()->getTypeID() == 11) {
+      std::cout << "first operand is: " << I.getOperand(0)->getType()->getPrimitiveSizeInBits() << std::endl;
+      std::cout << "second operand is: " << I.getOperand(1)->getType()->getPrimitiveSizeInBits() << std::endl;
+    }
+  }
+*/
   SDValue Op1 = getValue(I.getOperand(0));
   SDValue Op2 = getValue(I.getOperand(1));
   SDValue BinNodeValue = DAG.getNode(Opcode, getCurSDLoc(), Op1.getValueType(),
@@ -3844,7 +3851,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
       uint16_t loadSize;
 //ReallyPackedStructMap.erase(ReallyPackedStructMap.find_as(Ptr));
 //std::cout << "load ptr id: " << Ptr.getValueID() << std::endl;
-      //Ptr.setValueID(-1);
+      Ptr.resetValueID();
       if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -3872,7 +3879,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
 
 
       if (loadSize * 8 == bitFieldSize) {
-        SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, A,
+        SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, Ptr,
                                 MachinePointerInfo(SV, Offsets[i]), Alignment,
                                 MMOFlags, AAInfo, Ranges);
 //std::cout << "in load opcode: " << L.getNode()->getOpcode() << std::endl;
@@ -3884,7 +3891,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
         EVT PtrTy = EVT::getEVT(loadType);
 
         // Load the minimum amount of bytes needed
-        SDValue L = DAG.getLoad(PtrTy, dl, Root, A,
+        SDValue L = DAG.getLoad(PtrTy, dl, Root, Ptr,
                               MachinePointerInfo(SV, Offsets[i]), Alignment,
                               MMOFlags, AAInfo, Ranges);
 
@@ -4098,7 +4105,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       uint16_t loadSize;
 //ReallyPackedStructMap.erase(ReallyPackedStructMap.find_as(Ptr));
 //std::cout << "st ptr id: " << Ptr.getValueID() << std::endl;
-      //Ptr.setValueID(-1);
+      Ptr.resetValueID();
       if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -4124,7 +4131,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       //std::cout << "store id found: " << Ptr.getValueID() << std::endl;
       if (loadSize * 8 == bitFieldSize) {
         SDValue St = DAG.getStore(
-            Root, dl, SDValue(Src.getNode(), Src.getResNo() + i), Add,
+            Root, dl, SDValue(Src.getNode(), Src.getResNo() + i), Ptr,
             MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
 //std::cout << "on the store node type: " << St.getNode()->getOpcode() << std::endl;
         Chains[ChainI] = St;
@@ -4133,7 +4140,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
         EVT PtrTy = EVT::getEVT(loadType);
 //std::cout << "load size: " << loadSize * 8 << std::endl;
         // Loaded the minimum amount of bytes needed
-        SDValue Load = DAG.getLoad(PtrTy, dl, Root, /*Ptr*/Add, MachinePointerInfo(PtrV));
+        SDValue Load = DAG.getLoad(PtrTy, dl, Root, Ptr, MachinePointerInfo(PtrV));
   //std::cout << "on the store load node type: " << Load.getNode()->getOpcode() << std::endl;
         uint64_t inWordOffset = Offset - (Offset/8)*8;
         //std::cout << "inwordoffset: " << inWordOffset << std::endl;
@@ -4158,7 +4165,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   //std::cout << "on the store or node type: " << Or.getNode()->getOpcode() << std::endl;
         // Finally store the entire word that was loaded at the beggining
         SDValue St = DAG.getStore(
-            Root, dl, Or, Add,
+            Root, dl, Or, Ptr,
             MachinePointerInfo(PtrV, Offsets[i]), Alignment, MMOFlags, AAInfo);
         //std::cout << "on the store st node type: " << St.getNode()->getOpcode() << std::endl;
         

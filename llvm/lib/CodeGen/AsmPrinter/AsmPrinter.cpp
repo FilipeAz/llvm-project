@@ -2407,16 +2407,58 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
   unsigned Size = DL.getTypeAllocSize(CS->getType());
   const StructLayout *Layout = DL.getStructLayout(CS->getType());
   uint64_t SizeSoFar = 0;
+  // ORedValues will be used to store the ored bitfields that can be stored in a single word.
+  // WordSize is to keep the size of the word between iterations.
+  uint64_t ORedValues = 0, WordSize = 0;
   for (unsigned i = 0, e = CS->getNumOperands(); i != e; ++i) {
     const Constant *Field = CS->getOperand(i);
+    
+    // Check if padding is needed and insert one or more 0s.
+    uint64_t FieldSize = DL.getTypeAllocSize(Field->getType());
+
+    // If we have a ReallyPacked Struct and this is an Integer Type we may need to do some additional math.
+    if (Layout->isReallyPacked() && Field->getType()->getTypeID() == 11) {
+      FieldSize = Field->getType()->getPrimitiveSizeInBits();
+
+      // If we are still gathering bitfields do the math here.
+      if ((WordSize == 0 && FieldSize % 8 != 0) || WordSize % 8 != 0) {
+        WordSize += Field->getType()->getPrimitiveSizeInBits();
+        ORedValues = ORedValues << Field->getType()->getPrimitiveSizeInBits();
+        ORedValues |= Field->getUniqueInteger().getLimitedValue();
+        continue;
+      }
+      if (WordSize != 0) {
+        llvm::APInt Val = llvm::APInt(WordSize, ORedValues);
+        const Constant *OldField = llvm::Constant::getIntegerValue(llvm::Type::getIntNTy(CS->getContext(), WordSize), Val);
+        
+        // Print the bitfields that we have been gathering in one single word.
+        emitGlobalConstantImpl(DL, OldField, AP, BaseCV, Offset + SizeSoFar);
+
+        SizeSoFar += WordSize/8;
+
+        // Start a new bitfield if that is the case.
+        if (FieldSize % 8 != 0) {
+          WordSize = Field->getType()->getPrimitiveSizeInBits();
+          ORedValues = Field->getUniqueInteger().getLimitedValue();
+          continue;
+        }
+      }
+    }
+    
+    WordSize = 0;
+    ORedValues = 0;
 
     // Print the actual field value.
     emitGlobalConstantImpl(DL, Field, AP, BaseCV, Offset + SizeSoFar);
 
-    // Check if padding is needed and insert one or more 0s.
-    uint64_t FieldSize = DL.getTypeAllocSize(Field->getType());
-    uint64_t PadSize = ((i == e-1 ? Size : Layout->getElementOffset(i+1))
+    uint64_t PadSize;
+    // ReallyPacked Structs don't need padding since it is explicit in there.
+    if (Layout->isReallyPacked())
+      PadSize = 0;
+    else
+      PadSize = ((i == e-1 ? Size : Layout->getElementOffset(i+1))
                         - Layout->getElementOffset(i)) - FieldSize;
+
     SizeSoFar += FieldSize + PadSize;
 
     // Insert padding - this may include padding to increase the size of the
@@ -2424,6 +2466,17 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
     // as padding to ensure that the next field starts at the right offset.
     AP.OutStreamer->EmitZeros(PadSize);
   }
+
+  if (WordSize != 0) {
+    llvm::APInt Val = llvm::APInt(WordSize, ORedValues);
+    const Constant *OldField = llvm::Constant::getIntegerValue(llvm::Type::getIntNTy(CS->getContext(), WordSize), Val);
+    
+    // Print the bitfields that we have been gathering in one single word.
+    emitGlobalConstantImpl(DL, OldField, AP, BaseCV, Offset + SizeSoFar);
+
+    SizeSoFar += WordSize/8;
+  }
+
   assert(SizeSoFar == Layout->getSizeInBytes() &&
          "Layout of constant struct may be incorrect!");
 }
@@ -2671,7 +2724,7 @@ static void emitGlobalConstantImpl(const DataLayout &DL, const Constant *CV,
   if (const ConstantArray *CVA = dyn_cast<ConstantArray>(CV))
     return emitGlobalConstantArray(DL, CVA, AP, BaseCV, Offset);
 
-  if (const ConstantStruct *CVS = dyn_cast<ConstantStruct>(CV))
+  if (const ConstantStruct *CVS = dyn_cast<ConstantStruct>(CV)) 
     return emitGlobalConstantStruct(DL, CVS, AP, BaseCV, Offset);
 
   if (const ConstantExpr *CE = dyn_cast<ConstantExpr>(CV)) {
