@@ -3916,7 +3916,7 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
         //SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, PtrTy, And, DAG.getConstant(loadSize * 8, dl, And.getValueType()),  
         //                                Flags);
 
-        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, dl, EVT::getEVT(loadType), And, DAG.getConstant(bitFieldSize, dl, 
+        SDValue Trunc = DAG.getNode(ISD::TRUNCATE, dl, EVT::getEVT(IntegerType::get(*DAG.getContext(), bitFieldSize)), And, DAG.getConstant(bitFieldSize, dl, 
                                           EVT::getEVT(IntegerType::get(*DAG.getContext(), bitFieldSize))), Flags);
 
         Values[i] = Trunc;

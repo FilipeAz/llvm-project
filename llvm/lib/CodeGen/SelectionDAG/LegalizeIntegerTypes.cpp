@@ -23,7 +23,7 @@
 #include "llvm/Support/KnownBits.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
-
+#include <iostream>
 #define DEBUG_TYPE "legalize-types"
 
 //===----------------------------------------------------------------------===//
@@ -1141,7 +1141,8 @@ void DAGTypeLegalizer::PromoteSetCCOperands(SDValue &NewLHS,SDValue &NewRHS,
   case ISD::SETNE: {
     SDValue OpL = GetPromotedInteger(NewLHS);
     SDValue OpR = GetPromotedInteger(NewRHS);
-
+    std::cout << "aaaaa\n";
+    std::cout << "opl opcode: " << OpL.getOpcode() << std::endl;
     // We would prefer to promote the comparison operand with sign extension.
     // If the width of OpL/OpR excluding the duplicated sign bits is no greater
     // than the width of NewLHS/NewRH, we can avoid inserting real truncate

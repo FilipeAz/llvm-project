@@ -20,7 +20,7 @@
 #include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
-
+#include <iostream>
 namespace llvm {
 
 //===----------------------------------------------------------------------===//
@@ -152,6 +152,7 @@ private:
       assert(I->second && "All Ids should be nonzero");
       return I->second;
     }
+    //std::cout << "nextvaluid: " << NextValueId << std::endl;
     // Add if it's not there.
     ValueToIdMap.insert(std::make_pair(V, NextValueId));
     IdToValueMap.insert(std::make_pair(NextValueId, V));
@@ -257,6 +258,7 @@ private:
   /// 16 bits of which contain rubbish.
   SDValue GetPromotedInteger(SDValue Op) {
     TableId &PromotedId = PromotedIntegers[getTableId(Op)];
+    std::cout << "table id: " << PromotedId << std::endl;
     SDValue PromotedOp = getSDValue(PromotedId);
     assert(PromotedOp.getNode() && "Operand wasn't promoted?");
     return PromotedOp;
