@@ -102,7 +102,7 @@
 #include <memory>
 #include <string>
 #include <utility>
-
+#include <iostream>
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -3328,6 +3328,29 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       for (Use &U : Inst->operands()) {
         if (!isa<ConstantVector>(U) && !isa<ConstantExpr>(U))
           continue;
+
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(U)) {
+          GEPOperator::op_iterator i = GEPO->idx_begin();
+          bool flag = false;
+          auto Type = GEPO->getSourceElementType();
+          for (; i != GEPO->idx_end(); i++) {
+            if (llvm::StructType *sty = dyn_cast<llvm::StructType>(Type))
+              if (sty->isReallyPacked()) {
+                flag = true;
+                break;
+              }
+            if (llvm::ArrayType *aty = dyn_cast<llvm::ArrayType>(Type)) {
+              Type = aty->getTypeAtIndex(i->get());
+            }
+            if (llvm::VectorType *vty = dyn_cast<llvm::VectorType>(Type))
+              Type = vty->getTypeAtIndex(i->get());
+            if (llvm::PointerType *pty = dyn_cast<llvm::PointerType>(Type))
+              Type = pty->getPointerElementType();
+                
+          }
+          if (flag)
+            continue; 
+        }
 
         auto *C = cast<Constant>(U);
         Constant *&FoldRes = FoldedConstants[C];

@@ -429,7 +429,6 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
   if (!RD->isUnion()) {
     if (llvm::StructType *ValSTy = dyn_cast<llvm::StructType>(ValTy))
       if (ValSTy->isReallyPacked()) {
-        std::cout << "im here\n";
         ReallyPacked = true;
       }
   }
@@ -481,7 +480,6 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
       if (auto *CI = dyn_cast<llvm::ConstantInt>(EltInit)) {
         AppendBitField(*Field, Layout.getFieldOffset(FieldNo), CI);
       } else {
-        std::cout << "im returning...\n";
         // We are trying to initialize a bitfield with a non-trivial constant,
         // this must require run-time code.
         return false;
@@ -491,7 +489,6 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
 
   // If the last field was a bitfield we may need to add a final padding.
   if (PreviousFieldEnd % 8 != 0 && ReallyPacked) {
-    std::cout << "im here and previousfieldend: " << PreviousFieldEnd << " and previousfield end next is: " << (PreviousFieldEnd/8 + 1)*8 << std::endl;
     Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                             llvm::APInt((PreviousFieldEnd/8 + 1)*8 - PreviousFieldEnd, 0)));
     PreviousFieldEnd = (PreviousFieldEnd/8 + 1)*8;
@@ -594,7 +591,7 @@ llvm::Constant *ConstStructBuilder::Finalize(QualType Ty) {
 
   if (ReallyPacked) {
     //AppendTailPadding(/*CharUnits::fromQuantity(STyBitSize/8)*/LayoutSizeInChars);
-    
+
     llvm::StructType *STy =
       llvm::ConstantStruct::getTypeForElements(CGM.getLLVMContext(),
                                                Elements, Packed, ReallyPacked);

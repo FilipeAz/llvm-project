@@ -1818,7 +1818,6 @@ RValue CodeGenFunction::EmitLoadOfBitfieldLValue(LValue LV,
   
   Address Ptr = LV.getBitFieldAddress();
   
-  // This should now return an array
   llvm::Value *Val = Builder.CreateLoad(Ptr, LV.isVolatileQualified(), "bf.load"); 
   
   if (isBitFieldInUnion) {

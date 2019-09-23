@@ -72,7 +72,7 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include <iostream>
+
 using namespace llvm;
 
 /// makeVTList - Return an instance of the SDVTList struct initialized with the
@@ -3282,7 +3282,6 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, unsigned Depth) const {
 unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
                                           unsigned Depth) const {
   EVT VT = Op.getValueType();
-  std::cout << "iiiiii\n";
   assert((VT.isInteger() || VT.isFloatingPoint()) && "Invalid VT!");
   unsigned VTBits = VT.getScalarSizeInBits();
   unsigned NumElts = DemandedElts.getBitWidth();
@@ -3745,7 +3744,7 @@ unsigned SelectionDAG::ComputeNumSignBits(SDValue Op, const APInt &DemandedElts,
     return Tmp;
   }
   }
-std::cout << "ttt\n";
+
   // If we are looking at the loaded value of the SDNode.
   if (Op.getResNo() == 0) {
     // Handle LOADX separately here. EXTLOAD case will fallthrough.
@@ -3762,7 +3761,7 @@ std::cout << "ttt\n";
       }
     }
   }
-std::cout << "ff\n";
+
   // Allow the target to implement this method for its nodes.
   if (Opcode >= ISD::BUILTIN_OP_END ||
       Opcode == ISD::INTRINSIC_WO_CHAIN ||
@@ -3777,7 +3776,7 @@ std::cout << "ff\n";
   // Finally, if we can prove that the top bits of the result are 0's or 1's,
   // use this information.
   KnownBits Known = computeKnownBits(Op, DemandedElts, Depth);
-std::cout << "vvv\n";
+
   APInt Mask;
   if (Known.isNonNegative()) {        // sign bit is 0
     Mask = Known.Zero;

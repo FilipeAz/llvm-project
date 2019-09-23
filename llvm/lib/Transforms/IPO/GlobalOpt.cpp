@@ -69,7 +69,7 @@
 #include <cstdint>
 #include <utility>
 #include <vector>
-
+#include <iostream>
 using namespace llvm;
 
 #define DEBUG_TYPE "globalopt"
@@ -2325,6 +2325,16 @@ OptimizeGlobalVars(Module &M, TargetLibraryInfo *TLI,
                    function_ref<DominatorTree &(Function &)> LookupDomTree,
                    SmallPtrSetImpl<const Comdat *> &NotDiscardableComdats) {
   bool Changed = false;
+
+  // First iterate through every global variable to see if any is a Really Packed Struct
+  // and in that case return without doing anything
+  for (Module::global_iterator GVI = M.global_begin(), E = M.global_end();
+       GVI != E; ) {
+    GlobalVariable *GV = &*GVI++;
+    if (llvm::StructType *STy = dyn_cast<llvm::StructType>(GV->getType()->getPointerElementType()))
+      if (STy->isReallyPacked())
+        return false;
+  }
 
   for (Module::global_iterator GVI = M.global_begin(), E = M.global_end();
        GVI != E; ) {
