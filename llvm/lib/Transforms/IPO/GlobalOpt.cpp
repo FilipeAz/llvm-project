@@ -2326,13 +2326,13 @@ OptimizeGlobalVars(Module &M, TargetLibraryInfo *TLI,
                    SmallPtrSetImpl<const Comdat *> &NotDiscardableComdats) {
   bool Changed = false;
 
-  // First iterate through every global variable to see if any is a Really Packed Struct
+  // First iterate through every global variable to see if any is a Bit Fields Struct
   // and in that case return without doing anything
   for (Module::global_iterator GVI = M.global_begin(), E = M.global_end();
        GVI != E; ) {
     GlobalVariable *GV = &*GVI++;
     if (llvm::StructType *STy = dyn_cast<llvm::StructType>(GV->getType()->getPointerElementType()))
-      if (STy->isReallyPacked())
+      if (STy->isExplicitlyPacked())
         return false;
   }
 

@@ -97,18 +97,18 @@ struct AnonStructTypeKeyInfo {
   struct KeyTy {
     ArrayRef<Type*> ETypes;
     bool isPacked;
-    bool isReallyPacked;
+    bool ExplicitlyPacked;
 
     KeyTy(const ArrayRef<Type*>& E, bool P, bool RP = false) :
-      ETypes(E), isPacked(P), isReallyPacked(RP) {}
+      ETypes(E), isPacked(P), ExplicitlyPacked(RP) {}
 
     KeyTy(const StructType *ST)
-        : ETypes(ST->elements()), isPacked(ST->isPacked()), isReallyPacked(ST->isReallyPacked()) {}
+        : ETypes(ST->elements()), isPacked(ST->isPacked()), ExplicitlyPacked(ST->isExplicitlyPacked()) {}
 
     bool operator==(const KeyTy& that) const {
       if (isPacked != that.isPacked)
         return false;
-      if (isReallyPacked != that.isReallyPacked)
+      if (ExplicitlyPacked != that.ExplicitlyPacked)
         return false;
       if (ETypes != that.ETypes)
         return false;

@@ -1047,21 +1047,21 @@ Constant *ConstantArray::getImpl(ArrayType *Ty, ArrayRef<Constant*> V) {
 
 StructType *ConstantStruct::getTypeForElements(LLVMContext &Context,
                                                ArrayRef<Constant*> V,
-                                               bool Packed, bool ReallyPacked) {
+                                               bool Packed, bool ExplicitlyPacked) {
   unsigned VecSize = V.size();
   SmallVector<Type*, 16> EltTypes(VecSize);
   for (unsigned i = 0; i != VecSize; ++i)
     EltTypes[i] = V[i]->getType();
 
-  return StructType::get(Context, EltTypes, Packed, ReallyPacked);
+  return StructType::get(Context, EltTypes, Packed, ExplicitlyPacked);
 }
 
 
 StructType *ConstantStruct::getTypeForElements(ArrayRef<Constant*> V,
-                                               bool Packed, bool ReallyPacked) {
+                                               bool Packed, bool ExplicitlyPacked) {
   assert(!V.empty() &&
          "ConstantStruct::getTypeForElements cannot be called on empty list");
-  return getTypeForElements(V[0]->getContext(), V, Packed, ReallyPacked);
+  return getTypeForElements(V[0]->getContext(), V, Packed, ExplicitlyPacked);
 }
 
 ConstantStruct::ConstantStruct(StructType *T, ArrayRef<Constant *> V)

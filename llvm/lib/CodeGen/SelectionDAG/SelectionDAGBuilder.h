@@ -93,8 +93,8 @@ class SelectionDAGBuilder {
   /// CurInst - The current instruction being visited
   const Instruction *CurInst = nullptr;
 
-  /// ReallyPackedStructMap - The really packed struct being visited by SDValue
-  DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>> ReallyPackedStructMap;
+  /// ExplicitlyPackedStructMap - The bit fields struct being visited by SDValue
+  DenseMap<SDValue, std::tuple<uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
   /// Used to tell apart gep nodes that are identical because of bitfields stored
   /// in the same word
   int NodeUniqueID = 0;
@@ -700,24 +700,19 @@ public:
   }
 
   /// Return the information for the specified SDValue if it exists.
-  std::tuple<const StructLayout*, unsigned, uint64_t> *getInfoforSDValue(SDValue V) {
-    if (ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end())
+  std::tuple<uint64_t, uint64_t, uint32_t> *getInfoforSDValue(SDValue V) {
+    if (ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end())
       return nullptr;
-    return &ReallyPackedStructMap[V];
+    return &ExplicitlyPackedStructMap[V];
   }
 
-  void setSDValueInfo(SDValue V, const StructLayout *StrLay, unsigned Field, uint64_t Offset) {
-    //assert((ReallyPackedStructMap.find(V) == ReallyPackedStructMap.end()) && "Already set info for this node!");
-    ReallyPackedStructMap.insert(std::make_pair(V, std::make_tuple(StrLay, Field, Offset)));
+  void setSDValueInfo(SDValue V, uint64_t BitFieldSize, uint64_t Offset, uint32_t OldID) {
+    //assert((ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end()) && "Already set info for this node!");
+    ExplicitlyPackedStructMap.try_emplace(V, std::make_tuple(BitFieldSize, Offset, OldID));
   }
 
-  void resetReallyPackedStructMap() {
-    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator i = ReallyPackedStructMap.begin();
-    DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator e = ReallyPackedStructMap.end();
-    for(; i != e; i++) {
-      i->first.resetValueID();
-      ReallyPackedStructMap.erase(i);
-    }
+  void eraseSDValueFromMap(SDValue V) {
+    ExplicitlyPackedStructMap.erase(V);
   }
 
   SDValue getNonRegisterValue(const Value *V);

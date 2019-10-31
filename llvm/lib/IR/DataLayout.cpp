@@ -35,7 +35,7 @@
 #include <cstdlib>
 #include <tuple>
 #include <utility>
-
+#include <iostream>
 using namespace llvm;
 
 //===----------------------------------------------------------------------===//
@@ -47,48 +47,59 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   StructAlignment = 0;
   StructSize = 0;
   IsPadded = false;
-  NumElements = ST->getNumElements();
-  IsReallyPacked = ST->isReallyPacked();
-  int bitsUsed = 0;
+  IsExplicitlyPacked = ST->isExplicitlyPacked();
+
+  unsigned bitsUsed = 0;
+  bool noOldFields = false;
+
+  if (IsExplicitlyPacked) {
+    NumElements = ST->getOldNumElements();
+    // If the structure has bit fields and the oldNumElements array is empty then
+    // the field types came from the ConstStructBuilder class and not from the clang ABI.
+    if (NumElements == 0) {
+      noOldFields = true;
+      NumElements = ST->getNumElements();
+    }
+  } else 
+    NumElements = ST->getNumElements();
 
   // Loop over each of the elements, placing them in memory.
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
-    Type *Ty = ST->getElementType(i);
+    Type *Ty;
+    if (IsExplicitlyPacked && !noOldFields)
+      Ty = ST->getOldElementType(i);
+    else
+      Ty = ST->getElementType(i);
     unsigned TyAlign = ST->isPacked() ? 1 : DL.getABITypeAlignment(Ty);
-
     // Add padding if necessary to align the data element properly.
-    if ((StructSize & (TyAlign-1)) != 0 && !IsReallyPacked) {
+    if (((StructSize & (TyAlign-1)) != 0) && !noOldFields) {
       IsPadded = true;
       StructSize = alignTo(StructSize, TyAlign);
-    } else if (IsReallyPacked) {
-      // Calculate offsets for the bitfields of Really Packed Structs.
-      MemberOffsets[i] = bitsUsed;
-      
-      if (Ty->isIntegerTy()) {
-        StructSize += Ty->getPrimitiveSizeInBits();
-        bitsUsed += Ty->getPrimitiveSizeInBits();
-      }
-      else {
-        StructSize += DL.getTypeAllocSize(Ty) * 8;
-        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
-      }
-
-      continue;
     }
 
     // Keep track of maximum alignment constraint.
-    StructAlignment = std::max(TyAlign, StructAlignment);
-	  MemberOffsets[i] = StructSize;
-    StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
-  }
+    if (!noOldFields)
+      StructAlignment = std::max(TyAlign, StructAlignment);
 
-  if (ST->isReallyPacked()) {
-    if (StructSize % 8 == 0)
-      StructSize /= 8;
-    else
-      StructSize = StructSize/8 + 1;
-    StructAlignment = StructSize;
-    return;
+    if (!IsExplicitlyPacked)
+      MemberOffsets[i] = StructSize;
+    else if (IsExplicitlyPacked && noOldFields) {
+      MemberOffsets[i] = bitsUsed;
+      if (Ty->isIntegerTy()) {
+        bitsUsed += Ty->getPrimitiveSizeInBits();
+      }
+      else {
+        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+      }
+    }
+    
+    if (noOldFields) {
+      if (Ty->isIntegerTy())
+        StructSize += Ty->getPrimitiveSizeInBits();
+      else
+        StructSize += DL.getTypeAllocSize(Ty) * 8;
+    } else
+      StructSize += DL.getTypeAllocSize(Ty); // Consume space for this data item
   }
 
   // Empty structures have alignment of 1 byte.
@@ -99,6 +110,24 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   if ((StructSize & (StructAlignment-1)) != 0) {
     IsPadded = true;
     StructSize = alignTo(StructSize, StructAlignment);
+  }
+  if (IsExplicitlyPacked && noOldFields) {
+    StructSize /= 8;
+    if (StructSize > 4)
+      StructAlignment = alignTo(StructSize, 4);
+    else
+      StructAlignment = 4;
+  } else if (IsExplicitlyPacked) {
+    NumElements = ST->getNumElements();
+    unsigned bitsUsed = 0;
+    for (unsigned i = 0, e = NumElements; i != e; ++i) {
+      Type *Ty = ST->getElementType(i);
+      MemberOffsets[i] = bitsUsed;
+      if (Ty->isIntegerTy()) 
+        bitsUsed += Ty->getPrimitiveSizeInBits();
+      else
+        bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+    }
   }
 }
 
@@ -718,7 +747,7 @@ unsigned DataLayout::getAlignment(Type *Ty, bool abi_or_pref) const {
 
   case Type::StructTyID: {
     // Packed structure types always have an ABI alignment of one.
-    if ((cast<StructType>(Ty)->isPacked() || cast<StructType>(Ty)->isReallyPacked()) && abi_or_pref)
+    if (cast<StructType>(Ty)->isPacked() && abi_or_pref)
       return 1;
 
     // Get the layout annotation... which is lazily created on demand.

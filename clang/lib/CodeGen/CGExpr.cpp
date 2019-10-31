@@ -4677,7 +4677,7 @@ RValue CodeGenFunction::EmitCall(QualType CalleeType, const CGCallee &OrigCallee
           CGM.GetAddrOfRTTIDescriptor(ProtoTy, /*ForEH=*/true);
       llvm::Type *PrefixStructTyElems[] = {PrefixSig->getType(), Int32Ty};
       llvm::StructType *PrefixStructTy = llvm::StructType::get(
-          CGM.getLLVMContext(), PrefixStructTyElems, /*isPacked=*/true, /*isReallyPacked=*/false);
+          CGM.getLLVMContext(), PrefixStructTyElems, /*isPacked=*/true, /*isExplicitlyPacked=*/false);
 
       llvm::Value *CalleePtr = Callee.getFunctionPointer();
 

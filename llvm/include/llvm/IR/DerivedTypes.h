@@ -238,7 +238,7 @@ class StructType : public CompositeType {
     SCDB_Packed = 2,
     SCDB_IsLiteral = 4,
     SCDB_IsSized = 8,
-    SCDB_ReallyPacked = 16
+    SCDB_ExplicitlyPacked = 16
   };
 
   /// For a named struct that actually has a name, this is a pointer to the
@@ -246,6 +246,9 @@ class StructType : public CompositeType {
   /// This is null if the type is an literal struct or if it is a identified
   /// type that has an empty name.
   void *SymbolTableEntry = nullptr;
+
+  Type * const * OldFieldTypes;
+  unsigned NumOldFieldTypes = 0;
 
 public:
   StructType(const StructType &) = delete;
@@ -256,10 +259,10 @@ public:
   static StructType *create(LLVMContext &Context);
 
   static StructType *create(ArrayRef<Type *> Elements, StringRef Name,
-                            bool isPacked = false, bool isReallyPacked = false);
+                            bool isPacked = false, bool ExplicitlyPacked = false);
   static StructType *create(ArrayRef<Type *> Elements);
   static StructType *create(LLVMContext &Context, ArrayRef<Type *> Elements,
-                            StringRef Name, bool isPacked = false, bool isReallyPacked = false);
+                            StringRef Name, bool isPacked = false, bool ExplicitlyPacked = false);
   static StructType *create(LLVMContext &Context, ArrayRef<Type *> Elements);
   template <class... Tys>
   static typename std::enable_if<are_base_of<Type, Tys...>::value,
@@ -272,10 +275,10 @@ public:
 
   /// This static method is the primary way to create a literal StructType.
   static StructType *get(LLVMContext &Context, ArrayRef<Type*> Elements,
-                         bool isPacked = false, bool isReallyPacked = false);
+                         bool isPacked = false, bool ExplicitlyPacked = false);
 
   /// Create an empty structure type.
-  static StructType *get(LLVMContext &Context, bool isPacked = false, bool isReallyPacked = false);
+  static StructType *get(LLVMContext &Context, bool isPacked = false, bool ExplicitlyPacked = false);
 
   /// This static method is a convenience method for creating structure types by
   /// specifying the elements as arguments. Note that this method always returns
@@ -292,7 +295,7 @@ public:
 
   bool isPacked() const { return (getSubclassData() & SCDB_Packed) != 0; }
 
-  bool isReallyPacked() const { return (getSubclassData() & SCDB_ReallyPacked) != 0; }
+  bool isExplicitlyPacked() const { return (getSubclassData() & SCDB_ExplicitlyPacked) != 0; }
 
   /// Return true if this type is uniqued by structural equivalence, false if it
   /// is a struct definition.
@@ -317,8 +320,18 @@ public:
   /// suffix if there is a collision. Do not call this on an literal type.
   void setName(StringRef Name);
 
+  /// Explicitly Packed structures have a different body and because of that the new layout
+  /// is different from the old one making them incompatible
+  void setOldFieldTypes(ArrayRef<Type*> FieldTypes);
+
+  unsigned getOldNumElements() { return NumOldFieldTypes; }
+
+  Type *getOldElementType(unsigned N) const {
+    return OldFieldTypes[N];
+  }
+
   /// Specify a body for an opaque identified type.
-  void setBody(ArrayRef<Type*> Elements, bool isPacked = false, bool isReallyPacked = false);
+  void setBody(ArrayRef<Type*> Elements, bool isPacked = false, bool ExplicitlyPacked = false);
 
   template <typename... Tys>
   typename std::enable_if<are_base_of<Type, Tys...>::value, void>::type

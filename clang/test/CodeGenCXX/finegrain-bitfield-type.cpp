@@ -16,7 +16,7 @@ struct S5 {
 };
 struct S5 a5;
 
-// CHECK: %struct.S4 = type \{ i28, i4, i12, i4 }/
+// CHECK: %struct.S4 = type \{ i28, i4, i12, i4, [2 x i8] }/
 // CHECK-NOT: %struct.S4 = type { i48 }
 // CHECK: %struct.S5 = type \{ i28, i4, i28, i4, i12, i4, [6 x i8] }/
 // CHECK-NOT: %struct.S5 = type { i80 }

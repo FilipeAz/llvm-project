@@ -3328,14 +3328,16 @@ static bool AddReachableCodeToWorklist(BasicBlock *BB, const DataLayout &DL,
       for (Use &U : Inst->operands()) {
         if (!isa<ConstantVector>(U) && !isa<ConstantExpr>(U))
           continue;
-
+        if (isa<BitCastOperator>(U)) {
+          continue;
+        }
         if (GEPOperator *GEPO = dyn_cast<GEPOperator>(U)) {
           GEPOperator::op_iterator i = GEPO->idx_begin();
           bool flag = false;
           auto Type = GEPO->getSourceElementType();
           for (; i != GEPO->idx_end(); i++) {
             if (llvm::StructType *sty = dyn_cast<llvm::StructType>(Type))
-              if (sty->isReallyPacked()) {
+              if (sty->isExplicitlyPacked()) {
                 flag = true;
                 break;
               }

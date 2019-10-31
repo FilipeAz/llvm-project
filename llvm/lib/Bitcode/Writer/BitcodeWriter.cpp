@@ -891,21 +891,22 @@ void ModuleBitcodeWriter::writeTypeTable() {
     }
     case Type::StructTyID: {
       StructType *ST = cast<StructType>(T);
-      if (ST->isReallyPacked()) {
-        // REALLY_PACKED_STRUCT: [eltty x N]
+      if (ST->isExplicitlyPacked()) {
+        // EXPLICITLY_PACKED_STRUCT: [eltty x N]
+
         // Output all of the element types.
         for (StructType::element_iterator I = ST->element_begin(),
             E = ST->element_end(); I != E; ++I)
           TypeVals.push_back(VE.getTypeID(*I));
 
         if (ST->isLiteral()) {
-          Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_ANON;
+          Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_ANON;
           AbbrevToUse = StructAnonAbbrev;
         } else {
           if (ST->isOpaque()) {
-            Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_OPAQUE;
+            Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_OPAQUE;
           } else {
-            Code = bitc::TYPE_CODE_REALLY_PACKED_STRUCT_NAMED;
+            Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_NAMED;
             AbbrevToUse = StructNamedAbbrev;
           }
 

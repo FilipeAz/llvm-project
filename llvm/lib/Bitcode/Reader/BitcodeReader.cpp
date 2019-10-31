@@ -1693,7 +1693,9 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = StructType::get(Context, EltTys, Record[0]);
       break;
     }
-    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_ANON: {  // REALLY_PACKED_STRUCT_ANON: [eltty x N]
+    case bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_ANON: {  // EXPLICITLY_PACKED_STRUCT_ANON: [eltty x N]
+      if (Record.size() < 1)
+        return error("Invalid record");
       SmallVector<Type*, 8> EltTys;
       for (unsigned i = 0, e = Record.size(); i != e; ++i) {
         if (Type *T = getTypeByID(Record[i]))
@@ -1740,7 +1742,10 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = Res;
       break;
     }
-    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_NAMED: { // REALLY_PACKED_STRUCT_NAMED: [eltty x N]
+    case bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_NAMED: { // EXPLICITLY_PACKED_STRUCT_NAMED: [eltty x N]
+      if (Record.size() < 1)
+        return error("Invalid record");
+
       if (NumRecords >= TypeList.size())
         return error("Invalid TYPE table");
 
@@ -1784,7 +1789,7 @@ Error BitcodeReader::parseTypeTableBody() {
       ResultTy = Res;
       break;
     }
-    case bitc::TYPE_CODE_REALLY_PACKED_STRUCT_OPAQUE: {  // REALLY_PACKED_STRUCT_OPAQUE: []
+    case bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_OPAQUE: {  // EXPLICITLY_PACKED_STRUCT_OPAQUE: []
       if (Record.size() != 0)
         return error("Invalid record");
 

@@ -339,9 +339,9 @@ bool FunctionType::isValidArgumentType(Type *ArgTy) {
 // Primitive Constructors.
 
 StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
-                            bool isPacked, bool isReallyPacked) {
+                            bool isPacked, bool ExplicitlyPacked) {
   LLVMContextImpl *pImpl = Context.pImpl;
-  const AnonStructTypeKeyInfo::KeyTy Key(ETypes, isPacked, isReallyPacked);
+  const AnonStructTypeKeyInfo::KeyTy Key(ETypes, isPacked, ExplicitlyPacked);
 
   StructType *ST;
   // Since we only want to allocate a fresh struct type in case none is found
@@ -355,7 +355,7 @@ StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
     // in-place.
     ST = new (Context.pImpl->TypeAllocator) StructType(Context);
     ST->setSubclassData(SCDB_IsLiteral);  // Literal struct.
-    ST->setBody(ETypes, isPacked, isReallyPacked);
+    ST->setBody(ETypes, isPacked, ExplicitlyPacked);
     *Insertion.first = ST;
   } else {
     // The struct type was found. Just return it.
@@ -365,14 +365,24 @@ StructType *StructType::get(LLVMContext &Context, ArrayRef<Type*> ETypes,
   return ST;
 }
 
-void StructType::setBody(ArrayRef<Type*> Elements, bool isPacked, bool isReallyPacked) {
+void StructType::setOldFieldTypes(ArrayRef<Type*> FieldTypes) {
+  NumOldFieldTypes = FieldTypes.size();
+  if (FieldTypes.empty()) {
+    OldFieldTypes = nullptr;
+    return;
+  }
+
+  OldFieldTypes = FieldTypes.copy(getContext().pImpl->TypeAllocator).data();
+}
+
+void StructType::setBody(ArrayRef<Type*> Elements, bool isPacked, bool ExplicitlyPacked) {
   assert(isOpaque() && "Struct body already set!");
 
   setSubclassData(getSubclassData() | SCDB_HasBody);
   if (isPacked)
     setSubclassData(getSubclassData() | SCDB_Packed);
-  if (isReallyPacked)
-    setSubclassData(getSubclassData() | SCDB_ReallyPacked);
+  if (ExplicitlyPacked)
+    setSubclassData(getSubclassData() | SCDB_ExplicitlyPacked);
   NumContainedTys = Elements.size();
 
   if (Elements.empty()) {
@@ -441,14 +451,14 @@ StructType *StructType::create(LLVMContext &Context, StringRef Name) {
   return ST;
 }
 
-StructType *StructType::get(LLVMContext &Context, bool isPacked, bool isReallyPacked) {
-  return get(Context, None, isPacked, isReallyPacked);
+StructType *StructType::get(LLVMContext &Context, bool isPacked, bool ExplicitlyPacked) {
+  return get(Context, None, isPacked, ExplicitlyPacked);
 }
 
 StructType *StructType::create(LLVMContext &Context, ArrayRef<Type*> Elements,
-                               StringRef Name, bool isPacked, bool isReallyPacked) {
+                               StringRef Name, bool isPacked, bool ExplicitlyPacked) {
   StructType *ST = create(Context, Name);
-  ST->setBody(Elements, isPacked, isReallyPacked);
+  ST->setBody(Elements, isPacked, ExplicitlyPacked);
   return ST;
 }
 
@@ -461,10 +471,10 @@ StructType *StructType::create(LLVMContext &Context) {
 }
 
 StructType *StructType::create(ArrayRef<Type*> Elements, StringRef Name,
-                               bool isPacked, bool isReallyPacked) {
+                               bool isPacked, bool ExplicitlyPacked) {
   assert(!Elements.empty() &&
          "This method may not be invoked with an empty list");
-  return create(Elements[0]->getContext(), Elements, Name, isPacked, isReallyPacked);
+  return create(Elements[0]->getContext(), Elements, Name, isPacked, ExplicitlyPacked);
 }
 
 StructType *StructType::create(ArrayRef<Type*> Elements) {

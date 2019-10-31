@@ -36,9 +36,9 @@ struct Inner {
 
 #pragma pack (pop)
 
-// CHECK: %struct.Inner = type \{ i1, i1, i1, i29, i30, i2 }/
+// CHECK: %struct.Inner = type \{ i1, i1, i1, i5, [3 x i8], i30, i2 }/
 
-// CHECK: %struct.A = type \{ i3, i9, i12, i8, i17, i7, i4, i4, i3, i5, i24 }/
+// CHECK: %struct.A = type \{ i3, i9, i12, i8, i17, i7, i4, i4, i3, i5, [3 x i8] }/
 
 #pragma pack(push, 1)
 
@@ -61,5 +61,5 @@ union HEADER {
 struct Inner variable = { 1,0,1, 21 };
 union HEADER hdr = {{1,2,3,4}};
 
-// CHECK: @variable = global %struct.Inner \{ i1 true, i1 false, i1 true, i29 0, i30 21, i2 0 }/, align 1
+// CHECK: @variable = global \{ i1, i1, i1, i29, i30, i2 }/ \{ i1 true, i1 false, i1 true, i29 0, i30 21, i2 0 }/, align 1
 // CHECK: @hdr = global { \{ i3, i9, i20, i17, i7, i4, i4, i3, i5, [3 x i8] }/ } { \{ i3, i9, i20, i17, i7, i4, i4, i3, i5, [3 x i8] }/ \{ i3 0, i9 1, i20 0, i17 2, i7 0, i4 3, i4 0, i3 -4, i5 0, [3 x i8] undef }/ }, align 1

@@ -634,8 +634,8 @@ void TypePrinting::printStructBody(StructType *STy, raw_ostream &OS) {
     OS << "opaque";
     return;
   }
-
-  if (STy->isReallyPacked())
+  
+  if (STy->isExplicitlyPacked())
     OS << '\\';
   else if (STy->isPacked())
     OS << '<';
@@ -654,7 +654,7 @@ void TypePrinting::printStructBody(StructType *STy, raw_ostream &OS) {
     OS << " }";
   }
 
-  if (STy->isReallyPacked())
+  if (STy->isExplicitlyPacked())
     OS << '/';
   else if (STy->isPacked())
     OS << '>';
@@ -1439,10 +1439,11 @@ static void WriteConstantInternal(raw_ostream &Out, const Constant *CV,
   }
 
   if (const ConstantStruct *CS = dyn_cast<ConstantStruct>(CV)) {
-    if (CS->getType()->isReallyPacked())
+    if (CS->getType()->isExplicitlyPacked())
       Out << '\\';
     else if (CS->getType()->isPacked())
       Out << '<';
+
     Out << '{';
     unsigned N = CS->getNumOperands();
     if (N) {
@@ -1465,7 +1466,7 @@ static void WriteConstantInternal(raw_ostream &Out, const Constant *CV,
     }
 
     Out << '}';
-    if (CS->getType()->isReallyPacked())
+    if (CS->getType()->isExplicitlyPacked())
       Out << '/';
     else if (CS->getType()->isPacked())
       Out << '>';

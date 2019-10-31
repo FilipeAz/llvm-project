@@ -476,11 +476,11 @@ public:
   /// Return an anonymous struct type to use for a constant with the specified
   /// set of elements. The list must not be empty.
   static StructType *getTypeForElements(ArrayRef<Constant*> V,
-                                        bool Packed = false, bool ReallyPacked = false);
+                                        bool Packed = false, bool ExplicitlyPacked = false);
   /// This version of the method allows an empty list.
   static StructType *getTypeForElements(LLVMContext &Ctx,
                                         ArrayRef<Constant*> V,
-                                        bool Packed = false, bool ReallyPacked = false);
+                                        bool Packed = false, bool ExplicitlyPacked = false);
 
   /// Specialization - reduce amount of casting.
   inline StructType *getType() const {

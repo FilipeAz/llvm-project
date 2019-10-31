@@ -1725,12 +1725,6 @@ void CodeGenFunction::EmitAutoVarInit(const AutoVarEmission &emission) {
       constant = replaceUndef(constant);
   }
 
-  // If we are dealing with a Really Packed struct let's use the the initializer 
-  // below instead (TODO)
-  /*if (llvm::StructType *STy = dyn_cast<llvm::StructType>(constant->getType()))
-    if (STy->isReallyPacked())
-      constant = nullptr;
-*/
   if (!constant) {
     initializeWhatIsTechnicallyUninitialized();
     LValue lv = MakeAddrLValue(Loc, type);

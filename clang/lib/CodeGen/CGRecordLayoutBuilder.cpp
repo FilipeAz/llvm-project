@@ -26,6 +26,7 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
+#include <iostream>
 
 using namespace clang;
 using namespace CodeGen;
@@ -740,7 +741,7 @@ bool wayToSortFieldsDecl(std::pair<const FieldDecl *, unsigned> a, std::pair<con
 CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
                                                   llvm::StructType *Ty) {
   CGRecordLowering Builder(*this, D, /*Packed=*/false);
-  
+  //std::cout << "name: " << "\n";
   Builder.lower(/*NonVirtualBaseType=*/false);
   
 
@@ -769,14 +770,17 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
 
   // If all the fields are no named bitfields there is no reason to do all the complicated math
   bool NoNamedBitFields = true;
-  llvm::DenseMap<const FieldDecl *, unsigned>::iterator fieldsIterator = Builder.Fields.begin();
-  for (; fieldsIterator != Builder.Fields.end(); fieldsIterator++) {
-    if (fieldsIterator->first->getIdentifier() != nullptr)
+  llvm::DenseMap<const FieldDecl *, CGBitFieldInfo>::iterator fieldsIterator = Builder.BitFields.begin();
+  for (; fieldsIterator != Builder.BitFields.end(); fieldsIterator++) {
+    if (fieldsIterator->first->getIdentifier() != nullptr) {
       NoNamedBitFields = false;
+      break;
+    }
   }
 
-
   if(!Builder.BitFields.empty() && !D->isUnion() && !NoNamedBitFields) {
+
+    //std::cout << "fieldtuypes size: " << Builder.FieldTypes.size() << "\n";
 
     // First we need to find out how many bits are actually needed (padding and everything) 
     // to safely store this struct
@@ -807,7 +811,119 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
 
     // Sort by order of declaration
     std::sort(FieldsDeclVector, FieldsDeclVector + Builder.Fields.size(), wayToSortFieldsDecl);
-    
+    /*for (unsigned i = 0; i < Builder.BitFields.size(); i++)
+      std::cout << "size of bitfields: " << OrderedBitFields[i].second.Size << "\n";
+      std::cout << "fields size: " << Builder.Fields.size() << " and bitfields size: " << Builder.BitFields.size() << "\n";
+    for (unsigned i = 0; i < Builder.FieldTypes.size(); i++) {
+      std::cout << "field type: " << Builder.FieldTypes[i]->getTypeID() << "\n";
+    }*/
+    unsigned fieldsDeclIter = 0, currentBitField = 0, newFieldsIndex = 0, bitsUsedSoFar = 0, StructSize = 0, StructAlignment = 0;
+    for (unsigned fieldTypesIndex = 0; fieldTypesIndex < Builder.FieldTypes.size(); fieldTypesIndex++) {
+      // Figure out if we need to insert padding
+      unsigned TyAlign = Builder.Packed ? 1 : Builder.DataLayout.getABITypeAlignment(Builder.FieldTypes[fieldTypesIndex]);
+      if (((StructSize & (TyAlign-1)) != 0) ) {
+        StructSize = llvm::alignTo(StructSize, TyAlign);
+      }
+      StructAlignment = std::max(TyAlign, StructAlignment);
+      // Insert Padding 
+      if (bitsUsedSoFar < StructSize * 8) {
+        int padding = (StructSize * 8) - bitsUsedSoFar;
+        // Any padding that is a multiple of 8 is an array of i8s
+        if (padding <= 8)
+          newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), padding));
+        else if (padding % 8 == 0)
+          newFieldTypes.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), 8), 
+                                                       padding/8));
+        else {
+          newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), padding%8));
+          newFieldsIndex++;
+          newFieldTypes.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), 8), 
+                                                       padding/8));
+        }
+        newFieldsIndex++;
+        bitsUsedSoFar = StructSize * 8;
+      }
+
+      // If there are no more fields the last type is there just for padding so we insert that in out Type vector
+      if (fieldsDeclIter == Builder.Fields.size()) {
+        newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
+        StructSize += Builder.DataLayout.getTypeAllocSize(Builder.FieldTypes[fieldTypesIndex]);
+        bitsUsedSoFar = StructSize * 8;
+        break;
+      }
+
+      // In C++ structs might inherit fields from other structs and that information does not belong to
+      // the Fields array but is present in the FieldTypes array
+      if (fieldTypesIndex < FieldsDeclVector[fieldsDeclIter].second) {
+        newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
+        newFieldsIndex++;
+        StructSize += Builder.DataLayout.getTypeAllocSize(Builder.FieldTypes[fieldTypesIndex]);
+        bitsUsedSoFar = StructSize * 8;
+        continue;
+      }
+
+      // Add regular fields to the new vectors (types and decl)
+      if ((FieldsDeclVector[fieldsDeclIter].first != OrderedBitFields[currentBitField].first) || 
+          (currentBitField == Builder.BitFields.size())) {
+        newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
+        newFields.insert(std::make_pair(FieldsDeclVector[fieldsDeclIter].first, newFieldsIndex));
+        // Only advance on the FieldsDeclVector if this type is in fact a field and not padding
+        if (FieldsDeclVector[fieldsDeclIter].second == fieldTypesIndex)
+          fieldsDeclIter++;
+        newFieldsIndex++;
+        StructSize += Builder.DataLayout.getTypeAllocSize(Builder.FieldTypes[fieldTypesIndex]);
+        bitsUsedSoFar = StructSize * 8;
+        continue;
+      }
+
+      // There is at least one bitfield in this word
+      while (FieldsDeclVector[fieldsDeclIter].second == fieldTypesIndex) {
+        int actualBitFieldSize = OrderedBitFields[currentBitField].second.Size;
+        /*if (OrderedBitFields[currentBitField].second.Size > Builder.DataLayout.getTypeSizeInBits(Builder.FieldTypes[fieldTypesIndex])) {
+          actualBitFieldSize = Builder.DataLayout.getTypeSizeInBits(Builder.FieldTypes[fieldTypesIndex]);
+        } else {
+          actualBitFieldSize = OrderedBitFields[currentBitField].second.Size;
+        }*/
+        newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), actualBitFieldSize));
+        if (!OrderedBitFields[currentBitField].first->isUnnamedBitfield())
+          newFields.insert(std::make_pair(OrderedBitFields[currentBitField].first, newFieldsIndex));
+        newFieldsIndex++;
+        currentBitField++;
+        fieldsDeclIter++;
+        bitsUsedSoFar += actualBitFieldSize;
+        // If there are no more bitfields in the structure we break
+        if (currentBitField == Builder.BitFields.size())
+          break;
+      }
+      // Update the struct size for padding reasons
+      if (Builder.Packed && Builder.FieldTypes[fieldTypesIndex]->isIntegerTy())
+        StructSize += Builder.FieldTypes[fieldTypesIndex]->getPrimitiveSizeInBits() / 8;
+      else
+        StructSize += Builder.DataLayout.getTypeAllocSize(Builder.FieldTypes[fieldTypesIndex]);
+    }
+    // Empty structures have alignment of 1 byte.
+    if (StructAlignment == 0) StructAlignment = 1;
+
+    // Add padding to the end of the struct so that it could be put in an array
+    // and all array elements would be aligned correctly.
+    if ((StructSize & (StructAlignment-1)) != 0) {
+      StructSize = llvm::alignTo(StructSize, StructAlignment);
+    }
+    // Add padding at the end if the last field was a bit field
+    if (bitsUsedSoFar < StructSize * 8) {
+      int padding = (StructSize * 8) - bitsUsedSoFar;
+      if (padding <= 8)
+        newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), padding));
+      else if (padding % 8 == 0)
+        newFieldTypes.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), 8), 
+                                                      padding/8));
+      else {
+        newFieldTypes.push_back(llvm::IntegerType::get(Ty->getContext(), padding%8));
+        newFieldTypes.push_back(llvm::ArrayType::get(llvm::IntegerType::get(Ty->getContext(), 8), 
+                                                      padding/8));
+      }
+    }
+    /*
     // Used to store the order of declaration correctly on the newFields Map
     unsigned newFieldsIndex = 0;
     // Iterator of the FieldTypes Vector
@@ -832,7 +948,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       newFieldsIndex++;
       fieldTypesIndex++;
       fieldDeclIter++;
-      // In case packing is explicit in the non bitfield portion of the struct because of the ReallyPacked type
+      // In case packing is explicit in the non bitfield portion of the struct because of the BitFields type
       for(; fieldTypesIndex < FieldsDeclVector[fieldDeclIter].second; fieldTypesIndex++) {
         newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
         //newFields.insert(std::make_pair(nullptr, newFieldsIndex));
@@ -900,7 +1016,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
           newFieldsIndex++;
           fieldTypesIndex++;
           fieldDeclIter++;
-          // In case packing is explicit in the non bitfield portion of the struct because of the ReallyPacked type
+          // In case packing is explicit in the non bitfield portion of the struct because of the BitFields type
           for(; fieldTypesIndex < FieldsDeclVector[fieldDeclIter].second; fieldTypesIndex++) {
           newFieldTypes.push_back(Builder.FieldTypes[fieldTypesIndex]);
           //newFields.insert(std::make_pair(nullptr, newFieldsIndex));
@@ -949,9 +1065,16 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
       newFieldsIndex++;
       fieldDeclIter++;
     }
+    //for (int i = 0; i<newFieldTypes.size(); i++)
+    //  std::cout << "types: " << newFieldTypes[i]->getPrimitiveSizeInBits() << "\n";
+
+for (int i = 0; i<newFieldTypes.size(); i++)
+      std::cout << "types: " << newFieldTypes[i]->getPrimitiveSizeInBits() << "\n";*/
 
     // Finally set the body of the struct with the newly calculated bitfield storage
-    Ty->setBody(newFieldTypes, false, true);
+    // If the new computed types are exactly the same then we can just use the ABI information
+    Ty->setOldFieldTypes(Builder.FieldTypes);
+    Ty->setBody(newFieldTypes, Builder.Packed, true);
   } else {
 	  Ty->setBody(Builder.FieldTypes, Builder.Packed);  
   }
@@ -964,7 +1087,7 @@ CGRecordLayout *CodeGenTypes::ComputeRecordLayout(const RecordDecl *D,
   RL->CompleteObjectVirtualBases.swap(Builder.VirtualBases);
 
   // Add all the field numbers.
-  if(!Builder.BitFields.empty() && !D->isUnion()) {
+  if(!Builder.BitFields.empty() && !D->isUnion() && !NoNamedBitFields) {
 	  RL->FieldInfo.swap(/*Builder.Fields*/newFields);
   } else {
 	  RL->FieldInfo.swap(Builder.Fields);

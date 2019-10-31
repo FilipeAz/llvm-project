@@ -28,7 +28,7 @@
 #include "llvm/IR/GlobalVariable.h"
 using namespace clang;
 using namespace CodeGen;
-#include <iostream>
+
 //===----------------------------------------------------------------------===//
 //                            ConstStructBuilder
 //===----------------------------------------------------------------------===//
@@ -42,7 +42,7 @@ class ConstStructBuilder {
   // PreviousFieldEnd helps us know if there are padding between the ending 
   // of a bitfield and the beggining of then next field
   uint64_t PreviousFieldEnd = 0;
-  bool ReallyPacked;
+  bool ExplicitlyPacked;
   bool Packed;
   CharUnits NextFieldOffsetInChars;
   CharUnits LLVMStructAlignment;
@@ -60,7 +60,7 @@ public:
 
 private:
   ConstStructBuilder(ConstantEmitter &emitter)
-    : CGM(emitter.CGM), Emitter(emitter), ReallyPacked(false), Packed(false),
+    : CGM(emitter.CGM), Emitter(emitter), ExplicitlyPacked(false), Packed(false),
     NextFieldOffsetInChars(CharUnits::Zero()),
     LLVMStructAlignment(CharUnits::One()) { }
 
@@ -102,22 +102,15 @@ AppendField(const FieldDecl *Field, uint64_t FieldOffset,
             llvm::Constant *InitCst) {
   const ASTContext &Context = CGM.getContext();
 
-  if (ReallyPacked) {
+  if (ExplicitlyPacked) {
     // If padding is needed.
     if (PreviousFieldEnd != FieldOffset) {
       Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                               llvm::APInt(FieldOffset - PreviousFieldEnd, 0)));
-      
     }
 
-    llvm::DataLayout DataLayout = CGM.getDataLayout();
-    if (InitCst->getType()->getTypeID() == 11) {
-      PreviousFieldEnd = FieldOffset + InitCst->getType()->getPrimitiveSizeInBits();
-    } else {
-      PreviousFieldEnd = FieldOffset + DataLayout.getTypeAllocSize(InitCst->getType()) * 8;
-    }
-    
-    NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd);
+    PreviousFieldEnd = FieldOffset;
+    NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd/8);
   }
 
   CharUnits FieldOffsetInChars = Context.toCharUnitsFromBits(FieldOffset);
@@ -137,8 +130,10 @@ AppendBytes(CharUnits FieldOffsetInChars, llvm::Constant *InitCst) {
   CharUnits AlignedNextFieldOffsetInChars =
       NextFieldOffsetInChars.alignTo(FieldAlignment);
 
-  // There is no need for padding if we have a ReallyPacked Struct.
-  if (!ReallyPacked) {
+  // There is no need for padding if we have an ExplicitlyPacked Struct.
+  if (!ExplicitlyPacked) {
+    assert(NextFieldOffsetInChars <= FieldOffsetInChars
+        && "Field offset mismatch!");
     if (AlignedNextFieldOffsetInChars < FieldOffsetInChars) {
       // We need to append padding.
       AppendPadding(FieldOffsetInChars - NextFieldOffsetInChars);
@@ -169,8 +164,13 @@ AppendBytes(CharUnits FieldOffsetInChars, llvm::Constant *InitCst) {
   }
   // Add the field.
   Elements.push_back(InitCst);
-  NextFieldOffsetInChars = AlignedNextFieldOffsetInChars +
-                           getSizeInChars(InitCst);
+  if (ExplicitlyPacked)
+    NextFieldOffsetInChars += getSizeInChars(InitCst);
+  else
+    NextFieldOffsetInChars = AlignedNextFieldOffsetInChars +
+                            getSizeInChars(InitCst);
+
+  PreviousFieldEnd = NextFieldOffsetInChars.getQuantity() * 8;
 
   if (Packed)
     assert(LLVMStructAlignment == CharUnits::One() &&
@@ -183,28 +183,40 @@ void ConstStructBuilder::AppendBitField(const FieldDecl *Field,
                                         uint64_t FieldOffset,
                                         llvm::ConstantInt *CI) {
   const ASTContext &Context = CGM.getContext();
-  const uint64_t CharWidth = Context.getCharWidth();
+  //const uint64_t CharWidth = Context.getCharWidth();
   
-  if (ReallyPacked) {
+  if (ExplicitlyPacked) {
     llvm::APInt FieldValue = CI->getValue();
     uint64_t FieldSize = Field->getBitWidthValue(Context);
-    
+
     if (PreviousFieldEnd != FieldOffset) {
       Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                               llvm::APInt(FieldOffset - PreviousFieldEnd, 0)));
     }
 
     PreviousFieldEnd = FieldOffset + FieldSize;
-    // We need to truncate the bitfield to the correct size.
-    FieldValue = FieldValue.trunc(FieldSize);
+
+    if (PreviousFieldEnd % 8 == 0)
+      NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd/8);
+
+    // Truncate the size of FieldValue to the bit field size.
+    if (FieldSize < FieldValue.getBitWidth())
+      FieldValue = FieldValue.trunc(FieldSize);
+
     Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                                 FieldValue));
 
     return;
   }
+  // In case all the bitfields are the size of the word they are in
+  /*PreviousFieldEnd = FieldOffset + Field->getBitWidthValue(Context);
+  NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd/8);
+  Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
+                                                CI->getValue()));
+  return;*/
 // I don't think what's next is needed anymore but I'll leave it here for now.
 
-
+/*
   uint64_t NextFieldOffsetInBits = Context.toBits(NextFieldOffsetInChars);
   if (FieldOffset > NextFieldOffsetInBits) {
     // We need to add padding.
@@ -345,7 +357,7 @@ void ConstStructBuilder::AppendBitField(const FieldDecl *Field,
   // Append the last element.
   Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                             FieldValue));
-  ++NextFieldOffsetInChars;
+  ++NextFieldOffsetInChars;*/
 }
 
 void ConstStructBuilder::AppendPadding(CharUnits PadSize) {
@@ -365,16 +377,13 @@ void ConstStructBuilder::AppendPadding(CharUnits PadSize) {
 }
 
 void ConstStructBuilder::AppendTailPadding(CharUnits RecordSize) {
-  /*if (PreviousFieldEnd % 8 != 0) {
-    Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
-                                            llvm::APInt((PreviousFieldEnd/8 + 1)*8 - PreviousFieldEnd, 0)));
-    PreviousFieldEnd = (PreviousFieldEnd/8 + 1)*8;
-  }*/
-  if (ReallyPacked) {
+
+  if (ExplicitlyPacked) {
     if (RecordSize - CharUnits::fromQuantity(PreviousFieldEnd/8) == CharUnits::Zero())
       return;
-      
+
     AppendPadding(RecordSize - CharUnits::fromQuantity(PreviousFieldEnd/8));
+    
     return;
   }
   assert(NextFieldOffsetInChars <= RecordSize &&
@@ -427,10 +436,14 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
  
   llvm::Type *ValTy = CGM.getTypes().ConvertType(Ty);
   if (!RD->isUnion()) {
-    if (llvm::StructType *ValSTy = dyn_cast<llvm::StructType>(ValTy))
-      if (ValSTy->isReallyPacked()) {
-        ReallyPacked = true;
+    if (llvm::StructType *ValSTy = dyn_cast<llvm::StructType>(ValTy)) {
+      if (ValSTy->isExplicitlyPacked()) {
+        ExplicitlyPacked = true;
       }
+      if (ValSTy->isPacked()) {
+        Packed = true;
+      }
+    }
   }
 
   unsigned FieldNo = 0;
@@ -466,15 +479,8 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
       return false;
 
     if (!Field->isBitField()) {
-      if (ReallyPacked) {
-        if (PreviousFieldEnd % 8 != 0)
-          AppendField(*Field, (PreviousFieldEnd/8 + 1)*8, EltInit);
-        else
-          AppendField(*Field, PreviousFieldEnd, EltInit);
-      } else {
-        // Handle non-bitfield members.
-        AppendField(*Field, Layout.getFieldOffset(FieldNo), EltInit);
-      }
+      // Handle non-bitfield members.
+      AppendField(*Field, Layout.getFieldOffset(FieldNo), EltInit);
     } else {
       // Otherwise we have a bitfield.
       if (auto *CI = dyn_cast<llvm::ConstantInt>(EltInit)) {
@@ -488,10 +494,13 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
   }
 
   // If the last field was a bitfield we may need to add a final padding.
-  if (PreviousFieldEnd % 8 != 0 && ReallyPacked) {
+  if (PreviousFieldEnd % 8 != 0 && ExplicitlyPacked) {
     Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                             llvm::APInt((PreviousFieldEnd/8 + 1)*8 - PreviousFieldEnd, 0)));
+
     PreviousFieldEnd = (PreviousFieldEnd/8 + 1)*8;
+
+    NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd);
   }
 
   return true;
@@ -588,18 +597,24 @@ llvm::Constant *ConstStructBuilder::Finalize(QualType Ty) {
   const ASTRecordLayout &Layout = CGM.getContext().getASTRecordLayout(RD);
 
   CharUnits LayoutSizeInChars = Layout.getSize();
-
-  if (ReallyPacked) {
-    //AppendTailPadding(/*CharUnits::fromQuantity(STyBitSize/8)*/LayoutSizeInChars);
+  if (ExplicitlyPacked) {
+    AppendTailPadding(LayoutSizeInChars);
 
     llvm::StructType *STy =
       llvm::ConstantStruct::getTypeForElements(CGM.getLLVMContext(),
-                                               Elements, Packed, ReallyPacked);
+                                               Elements, Packed, ExplicitlyPacked);
 
     llvm::Type *ValTy = CGM.getTypes().ConvertType(Ty);
     if (llvm::StructType *ValSTy = dyn_cast<llvm::StructType>(ValTy)) {
-      //if (ValSTy->isLayoutIdentical(STy))
+      if (ValSTy->isLayoutIdentical(STy))
         STy = ValSTy;
+      else if (ValSTy->isExplicitlyPacked()) {
+        // Set OldFields on the Const Struct to get the ABI layout later
+        SmallVector<llvm::Type *, 16> oldFields;
+        for (unsigned i = 0; i < ValSTy->getOldNumElements(); i++)
+          oldFields.push_back(ValSTy->getOldElementType(i));
+        STy->setOldFieldTypes(oldFields);
+      }
     }
 
     llvm::Constant *Result = llvm::ConstantStruct::get(STy, Elements);

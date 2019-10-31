@@ -922,8 +922,8 @@ redo_gep:
       const Value *Op = *i;
       if (StructType *STy = GTI.getStructTypeOrNull()) {
         const StructLayout *SL = DL.getStructLayout(STy);
-        // If struct is ReallyPacked don't try to emit the code right away
-        if (SL->isReallyPacked()) {
+        // If struct is ExplicitlyPacked don't try to emit the code right away
+        if (SL->isExplicitlyPacked()) {
           return false;
         }
         Disp += SL->getElementOffset(cast<ConstantInt>(Op)->getZExtValue());

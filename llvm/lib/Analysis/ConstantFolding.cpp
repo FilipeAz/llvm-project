@@ -1009,7 +1009,7 @@ Constant *ConstantFoldInstOperandsImpl(const Value *InstOrCE, unsigned Opcode,
   if (auto *GEP = dyn_cast<GEPOperator>(InstOrCE)) {
 
     if (isa<StructType>(GEP->getSourceElementType())) {
-      if (cast<StructType>(GEP->getSourceElementType())->isReallyPacked())
+      if (cast<StructType>(GEP->getSourceElementType())->isExplicitlyPacked())
         return nullptr;
     }
 

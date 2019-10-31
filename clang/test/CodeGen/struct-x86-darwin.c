@@ -6,7 +6,7 @@
 // CHECK: STestB2 = type \{ i8, i5, i3, i4, i4 }/
 // CHECK: STestB3 = type \{ i8, i2, i6 }/
 // CHECK: STestB4 = type \{ i8, i2, i6, i8, i8 }/
-// CHECK: STestB5 = type \{ i8, i10, i6, i8 }/
+// CHECK: STestB5 = type \{ i8, i8, i10, i6, i8, i8 }/
 // CHECK: STestB6 = type \{ i1, i7, i8, i13, i3 }/
 // Test struct layout for x86-darwin target
 

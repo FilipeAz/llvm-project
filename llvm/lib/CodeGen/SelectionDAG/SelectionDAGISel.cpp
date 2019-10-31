@@ -687,7 +687,6 @@ void SelectionDAGISel::SelectBasicBlock(BasicBlock::const_iterator Begin,
     if (!ElidedArgCopyInstrs.count(&*I))
       SDB->visit(*I);
   }
-  SDB->resetReallyPackedStructMap();
 
   // Make sure the root of the DAG is up-to-date.
   CurDAG->setRoot(SDB->getControlRoot());
