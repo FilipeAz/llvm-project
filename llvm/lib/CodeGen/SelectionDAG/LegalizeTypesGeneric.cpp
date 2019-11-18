@@ -574,12 +574,12 @@ void DAGTypeLegalizer::SplitRes_UNDEF(SDNode *N, SDValue &Lo, SDValue &Hi) {
   Hi = DAG.getUNDEF(HiVT);
 }
 
-/*void DAGTypeLegalizer::SplitRes_POISON(SDNode *N, SDValue &Lo, SDValue &Hi) {
+void DAGTypeLegalizer::SplitRes_POISON(SDNode *N, SDValue &Lo, SDValue &Hi) {
   EVT LoVT, HiVT;
   std::tie(LoVT, HiVT) = DAG.GetSplitDestVTs(N->getValueType(0));
   Lo = DAG.getPOISON(LoVT);
   Hi = DAG.getPOISON(HiVT);
-}*/
+}
 
 void DAGTypeLegalizer::SplitRes_FREEZE(SDNode *N, SDValue &Lo, SDValue &Hi) {
   SDValue L, H;

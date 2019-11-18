@@ -119,7 +119,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-#include <iostream>
+
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1332,8 +1332,8 @@ SDValue SelectionDAGBuilder::getValueImpl(const Value *V) {
         EVT EltVT = ValueVTs[i];
         if (isa<UndefValue>(C))
           Constants[i] = DAG.getUNDEF(EltVT);
-	/*else if (isa<PoisonValue>(C))
-          Constants[i] = DAG.getPOISON(EltVT);*/
+	      else if (isa<PoisonValue>(C))
+          Constants[i] = DAG.getPOISON(EltVT);
         else if (EltVT.isFloatingPoint())
           Constants[i] = DAG.getConstantFP(0, getCurSDLoc(), EltVT);
         else
@@ -2861,14 +2861,7 @@ void SelectionDAGBuilder::visitBinary(const User &I, unsigned Opcode) {
     Flags.setVectorReduction(true);
     LLVM_DEBUG(dbgs() << "Detected a reduction operation:" << I << "\n");
   }
-  /*if (Opcode == ISD::XOR) {
-    std::cout << "im a xor" << std::endl;
-    if (I.getOperand(0)->getType()->getTypeID() == 11) {
-      std::cout << "first operand is: " << I.getOperand(0)->getType()->getPrimitiveSizeInBits() << std::endl;
-      std::cout << "second operand is: " << I.getOperand(1)->getType()->getPrimitiveSizeInBits() << std::endl;
-    }
-  }
-*/
+
   SDValue Op1 = getValue(I.getOperand(0));
   SDValue Op2 = getValue(I.getOperand(1));
   SDValue BinNodeValue = DAG.getNode(Opcode, getCurSDLoc(), Op1.getValueType(),

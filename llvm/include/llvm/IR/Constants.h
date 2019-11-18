@@ -1340,7 +1340,7 @@ public:
 
   /// Static factory methods - Return an 'poison' object of the specified type.
   static PoisonValue *get(Type *T);
-/*I'm not sure if these methods are needed.
+
   /// If this Poison has array or vector type, return a Poison with the right
   /// element type.
   PoisonValue *getSequentialElement() const;
@@ -1358,7 +1358,7 @@ public:
 
   /// Return the number of elements in the array, vector, or struct.
   unsigned getNumElements() const;
-*/
+
   /// Methods for support type inquiry through isa, cast, and dyn_cast:
   static bool classof(const Value *V) {
     return V->getValueID() == PoisonValueVal;

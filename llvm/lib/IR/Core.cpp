@@ -1017,11 +1017,11 @@ LLVMValueRef LLVMGetUndef(LLVMTypeRef Ty) {
 }
 
 /// Poison
-/*
+
 LLVMValueRef LLVMGetPoison(LLVMTypeRef Ty) {
   return wrap(PoisonValue::get(unwrap(Ty)));
 }
-*/
+
 /// Poison
 
 LLVMBool LLVMIsConstant(LLVMValueRef Ty) {
@@ -1039,11 +1039,11 @@ LLVMBool LLVMIsUndef(LLVMValueRef Val) {
 }
 
 /// Poison
-/*
+
 LLVMBool LLVMIsPoison(LLVMValueRef Val) {
   return isa<PoisonValue>(unwrap(Val));
 }
-*/
+
 /// Poison
 
 LLVMValueRef LLVMConstPointerNull(LLVMTypeRef Ty) {

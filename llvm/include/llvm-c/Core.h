@@ -1543,7 +1543,7 @@ LLVMTypeRef LLVMX86MMXType(void);
           macro(Function)                   \
           macro(GlobalVariable)             \
       macro(UndefValue)                     \
-   /* macro(PoisonValue)*/                  \
+      macro(PoisonValue)                    \
     macro(Instruction)                      \
       macro(BinaryOperator)                 \
       macro(CallInst)                       \
@@ -1674,7 +1674,7 @@ LLVMBool LLVMIsUndef(LLVMValueRef Val);
 /**
  * Determine whether a value instance is poison.
  */
-//LLVMBool LLVMIsPoison(LLVMValueRef Val);
+LLVMBool LLVMIsPoison(LLVMValueRef Val);
 
 /**
  * Convert value instances between types.
@@ -1839,7 +1839,7 @@ LLVMValueRef LLVMGetUndef(LLVMTypeRef Ty);
  *
  * @see llvm::PoisonValue::get()
  */
-//LLVMValueRef LLVMGetPoison(LLVMTypeRef Ty);
+LLVMValueRef LLVMGetPoison(LLVMTypeRef Ty);
 
 /**
  * Determine whether a value instance is null.

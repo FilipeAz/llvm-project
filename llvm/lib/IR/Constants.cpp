@@ -896,7 +896,7 @@ unsigned UndefValue::getNumElements() const {
 //===----------------------------------------------------------------------===//
 //                         PoisonValue Implementation
 //===----------------------------------------------------------------------===//
-/*
+
 PoisonValue *PoisonValue::getSequentialElement() const {
   return PoisonValue::get(getType()->getSequentialElementType());
 }
@@ -923,7 +923,7 @@ unsigned PoisonValue::getNumElements() const {
     return ST->getNumElements();
   return Ty->getStructNumElements();
 }
-*/
+
 //===----------------------------------------------------------------------===//
 //                            ConstantXXX Classes
 //===----------------------------------------------------------------------===//
