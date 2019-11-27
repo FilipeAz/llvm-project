@@ -688,6 +688,7 @@ void SelectionDAGISel::SelectBasicBlock(BasicBlock::const_iterator Begin,
       SDB->visit(*I);
   }
 
+  SDB->eraseSDValue();
   // Make sure the root of the DAG is up-to-date.
   CurDAG->setRoot(SDB->getControlRoot());
   HadTailCall = SDB->HasTailCall;

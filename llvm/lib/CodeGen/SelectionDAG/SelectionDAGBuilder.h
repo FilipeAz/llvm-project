@@ -94,7 +94,7 @@ class SelectionDAGBuilder {
   const Instruction *CurInst = nullptr;
 
   /// ExplicitlyPackedStructMap - The bit fields struct being visited by SDValue
-  DenseMap<SDValue, std::tuple<uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
+  DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
   /// Used to tell apart gep nodes that are identical because of bitfields stored
   /// in the same word
   int NodeUniqueID = 0;
@@ -700,19 +700,28 @@ public:
   }
 
   /// Return the information for the specified SDValue if it exists.
-  std::tuple<uint64_t, uint64_t, uint32_t> *getInfoforSDValue(SDValue V) {
-    if (ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end())
+  std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *getInfoforSDValue(int ID) {
+    if (ExplicitlyPackedStructMap.find(ID) == ExplicitlyPackedStructMap.end())
       return nullptr;
-    return &ExplicitlyPackedStructMap[V];
+    return &ExplicitlyPackedStructMap[ID];
   }
 
-  void setSDValueInfo(SDValue V, uint64_t BitFieldSize, uint64_t Offset, uint32_t OldID) {
+  void setSDValueInfo(int ID, SDValue V, uint64_t BitFieldSize, uint64_t Offset, uint32_t OldID) {
     //assert((ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end()) && "Already set info for this node!");
-    ExplicitlyPackedStructMap.try_emplace(V, std::make_tuple(BitFieldSize, Offset, OldID));
+    ExplicitlyPackedStructMap.try_emplace(ID, std::make_tuple(V, BitFieldSize, Offset, OldID));
   }
 
-  void eraseSDValueFromMap(SDValue V) {
-    ExplicitlyPackedStructMap.erase(V);
+  void eraseSDValueFromMap(int ID) {
+    ExplicitlyPackedStructMap.erase(ID);
+  }
+
+  void eraseSDValue() {
+    DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>>::iterator i = ExplicitlyPackedStructMap.begin(), 
+                                                                               e = ExplicitlyPackedStructMap.end();
+    for(;i != e; i++) {
+      std::get<0>(i->second).getNode()->setNodeId(std::get<3>(i->second));
+      ExplicitlyPackedStructMap.erase(i);
+    }
   }
 
   SDValue getNonRegisterValue(const Value *V);
