@@ -689,6 +689,8 @@ bool FastISel::selectGetElementPtr(const User *I) {
     const Value *Idx = GTI.getOperand();
     
     if (StructType *StTy = GTI.getStructTypeOrNull()) {
+      if (StTy->isExplicitlyPacked())
+        return false;
       uint64_t Field = cast<ConstantInt>(Idx)->getZExtValue();
       if (Field) {
         // N = N + Offset
