@@ -119,6 +119,7 @@
 #include <tuple>
 #include <utility>
 #include <vector>
+#include <iostream>
 using namespace llvm;
 using namespace PatternMatch;
 
@@ -1076,6 +1077,13 @@ void SelectionDAGBuilder::visit(const Instruction &I) {
   CurInst = &I;
 
   visit(I.getOpcode(), I);
+  /*if (I.getNumOperands() > 1) {
+    std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *Info = getInfoforSDValue(getValue(I.getOperand(0)).getNode()->getNodeId());
+    if (Info != nullptr) {
+      if(I.getOpcode() != 31 && I.getOpcode() != 32 && I.getOpcode() != 33 && I.getOpcode() != 48 && I.getOpcode() != 55)
+        std::cout << "opcode: " << I.getOpcode() << "\n";
+    }
+  }*/
   //std::cout << "opcode: " << I.getOpcode() << std::endl;
   if (auto *FPMO = dyn_cast<FPMathOperator>(&I)) {
     // Propagate the fast-math-flags of this IR instruction to the DAG node that
@@ -3522,7 +3530,7 @@ void SelectionDAGBuilder::visitExtractValue(const User &I) {
 
 void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
   Value *Op0 = I.getOperand(0);
-
+//std::cout << "gep plz\n";
   // Note that the pointer operand may be a vector of pointers. Take the scalar
   // element which holds a pointer.
   unsigned AS = Op0->getType()->getScalarType()->getPointerAddressSpace();
@@ -3559,9 +3567,16 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
           Flags.setNoUnsignedWrap(true);
 
         if (StrLay->isExplicitlyPacked()) {
-          N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
-                DAG.getConstant(Offset/8, dl, N.getValueType()), Flags);
-          
+          if (Offset%8==0)
+            N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
+                  DAG.getConstant(Offset/8, dl, N.getValueType()), Flags);
+          else
+            N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
+                  DAG.getConstant(Offset, dl, N.getValueType()), Flags);
+          /*std::pair<uint64_t, uint64_t> *Info = getInfoforSDValue(N);
+          if (Info != nullptr)
+            N = N.getValue(N.getResNo(), N.getValueID()+1);*/
+          //std::cout << "Novo N nodeid: " << N->getNodeId() << "\n";
           //std::cout << "gep offset: " << Offset << std::endl;
           /*if (StTy->isFunctionTy())
           ExplicitlyPackedStructMap.insert(std::make_pair(N, std::make_tuple(StrLay, Field, Offset)));
@@ -3578,16 +3593,16 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
             bitFieldSize = StrLay->getElementOffset(Field + 1) - Offset;*/
           //std::cout << "gep bitfieldsize: " << bitFieldSize << "\n";
           //if (bitFieldSize % 8 != 0) {
-            //N.setValueID(NodeUniqueID);
-            int oldUniqueID = N.getNode()->getNodeId();
-            N.getNode()->setNodeId(NodeUniqueID);
+            //N.setValueID(Offset);
+            //int oldUniqueID = N.getNode()->getNodeId();
+            //N.getNode()->setNodeId(NodeUniqueID);
             //std::cout << "uniqueid after changing: " << NodeUniqueID << std::endl;
             //std::cout << "gep offset and bitfield size: " << Offset << " " << bitFieldSize << "\n";
             //std::cout << "uniqueid after changing: " << N.getValueID() << std::endl;
             //ExplicitlyPackedStructMap.insert(std::make_pair(N, std::make_tuple(bitFieldSize, Offset)));
             //std::cout << "gep pointer of node: " << N.getNode() << std::endl;
-            setSDValueInfo(NodeUniqueID, N, bitFieldSize, Offset, oldUniqueID);
-            NodeUniqueID++;
+            setSDValueInfo(N, bitFieldSize, Offset);
+            //NodeUniqueID++;
             //}
         } else {
           N = DAG.getNode(ISD::ADD, dl, N.getValueType(), N,
@@ -3607,14 +3622,17 @@ void SelectionDAGBuilder::visitGetElementPtr(const User &I) {
             bitFieldSize = StrLay->getElementOffset(Field + 1);*/
 
           //if (bitFieldSize % 8 != 0) {
-            //N.setValueID(NodeUniqueID);
-            int oldUniqueID = N.getNode()->getNodeId();
-            N.getNode()->setNodeId(NodeUniqueID);
+            //N.setValueID(0);
+            /*std::pair<uint64_t, uint64_t> *Info = getInfoforSDValue(N);
+            if (Info != nullptr)
+              N = N.getValue(N.getResNo(), N.getValueID()+1);*/
+            //int oldUniqueID = N.getNode()->getNodeId();
+            //N.getNode()->setNodeId(NodeUniqueID);
             //std::cout << "uniqueid after changing: " << NodeUniqueID << std::endl;
             //std::cout << "gep offset and bitfield size: " << bitFieldSize << "\n";*/
             //ExplicitlyPackedStructMap.insert(std::make_pair(N, std::make_tuple(bitFieldSize, 0)));
-            setSDValueInfo(NodeUniqueID, N, bitFieldSize, 0, oldUniqueID);
-            NodeUniqueID++;
+            setSDValueInfo(N, bitFieldSize, 0);
+            //NodeUniqueID++;
           //}
 		    }
       }
@@ -3844,9 +3862,9 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
 
     // Find the info of the bitfield
     //DenseMap<SDValue, std::tuple<const StructLayout*, unsigned, uint64_t>>::iterator iter = ExplicitlyPackedStructMap.find_as(Ptr);
-    //std::cout << "ptr valueid: " << Ptr.getValueID() << std::endl;
+    //std::cout << "ptr nodeid: " << Ptr.getNode()->getNodeId() << std::endl;
     //if (iter != ExplicitlyPackedStructMap.end()) {
-    std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *Info = getInfoforSDValue(Ptr.getNode()->getNodeId());
+    std::pair<uint64_t, uint64_t> *Info = getInfoforSDValue(Ptr);
     //std::cout << "Load Ptr value id: " << Ptr.getValueID() << "\n";
     //std::cout << "sdnode irorder: " << Ptr.getNode()->getIROrder() << "\n";
     if (Info != nullptr) {
@@ -3857,14 +3875,15 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
       uint64_t Offset = std::get<2>(ExplicitlyPackedStructMap[Ptr]);*/
       //const StructLayout *StrLay = std::get<0>(*Info);
       //unsigned Field = std::get<1>(*Info);
-      uint64_t BitFieldSize = std::get<1>(*Info);
-      uint64_t Offset = std::get<2>(*Info);
+      uint64_t BitFieldSize = std::get<0>(*Info);
+      uint64_t Offset = std::get<1>(*Info);
       uint16_t loadSize;
       //eraseSDValueFromMap(Ptr);
       //Ptr.getNode()->setNodeId(std::get<2>(*Info));
-//ExplicitlyPackedStructMap.erase(Ptr);
+      //Ptr.getNode()->setNodeId(std::get<3>(*Info));
+//ExplicitlyPackedStructMap.erase(Ptr.getNode()->getNodeId());
       //Ptr.resetValueID();
-//std::cout << "load ptr id: " << Ptr.getValueID() << std::endl;
+//std::cout << "load ptr id: " << Ptr->getNodeId() << std::endl;
       /*if (Field + 1 == StrLay->getNumElements())
         bitFieldSize = StrLay->getSizeInBits() - Offset;
       else 
@@ -3886,10 +3905,11 @@ void SelectionDAGBuilder::visitLoad(const LoadInst &I) {
         else
           loadSize = (BitFieldSize / 8) + 1;
       }
-      //std::cout << "load sizes: " << loadSize * 8 << " " << BitFieldSize << std::endl;
+      //std::cout << "load sizes: " << loadSize * 8 << " " << BitFieldSize << " " << Offset << std::endl;
       //std::cout << "actual field size: " << SV->getType()->getPrimitiveSizeInBits() << std::endl;
       //std::cout << "load id found: " << Ptr.getValueID() << std::endl;
-
+      if (Offset%8!=0)
+        Ptr = DAG.getNode(ISD::SUB, dl, Ptr.getValueType(), Ptr, DAG.getConstant(Offset - Offset/8, dl, Ptr.getValueType()), Flags);
 
       if (loadSize * 8 == BitFieldSize) {
         SDValue L = DAG.getLoad(ValueVTs[i], dl, Root, Ptr,
@@ -4105,7 +4125,7 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
     //std::cout << "im in store " << std::endl;
     //if (iter != ExplicitlyPackedStructMap.end()) {
       //std::cout << "store pointer: " << Ptr.getNode() << std::endl;
-    std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *Info = getInfoforSDValue(Ptr.getNode()->getNodeId());
+    std::pair<uint64_t, uint64_t> *Info = getInfoforSDValue(Ptr);
     //std::cout << "store ptr id: " << Ptr.getValueID() << "\n";
     if (Info != nullptr) {
       //std::cout << "found ptrid\n";
@@ -4115,10 +4135,13 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
       uint64_t Offset = std::get<2>(ExplicitlyPackedStructMap[Ptr]);*/
       //const StructLayout *StrLay = std::get<0>(*Info);
       //unsigned Field = std::get<1>(*Info);
-      uint64_t BitFieldSize = std::get<1>(*Info);
-      uint64_t Offset = std::get<2>(*Info);
+      uint64_t BitFieldSize = std::get<0>(*Info);
+      uint64_t Offset = std::get<1>(*Info);
       uint16_t loadSize;
       //eraseSDValueFromMap(Ptr);
+      
+      //Ptr.getNode()->setNodeId(std::get<3>(*Info));
+//ExplicitlyPackedStructMap.erase(Ptr.getNode()->getNodeId());
       //Ptr.getNode()->setNodeId(std::get<2>(*Info));
 //ExplicitlyPackedStructMap.erase(Ptr);
       //Ptr.resetValueID();
@@ -4145,9 +4168,12 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
           loadSize = (BitFieldSize / 8) + 1;
       }
       //std::cout << "offset: " << Offset << "\n";
-      /*std::cout << "store sizes: " << loadSize * 8 << " " << BitFieldSize << std::endl;
-      std::cout << "offset: " << Offset << "\n";
-      std::cout << "store id found: " << Ptr.getNode()->getNodeId() << std::endl;*/
+      //std::cout << "store sizes: " << loadSize * 8 << " " << BitFieldSize << std::endl;
+      //std::cout << "offset: " << Offset << "\n";
+      //std::cout << "store id found: " << Ptr.getNode()->getNodeId() << std::endl;*/
+      if (Offset%8!=0)
+        Ptr = DAG.getNode(ISD::SUB, dl, Ptr.getValueType(), Ptr, DAG.getConstant(Offset - Offset/8, dl, Ptr.getValueType()), Flags);
+      //newPtr.getNode()->dump();
       if (loadSize * 8 == BitFieldSize) {
         SDValue St = DAG.getStore(
             Root, dl, SDValue(Src.getNode(), Src.getResNo() + i), Ptr,
@@ -4170,6 +4196,11 @@ void SelectionDAGBuilder::visitStore(const StoreInst &I) {
   //std::cout << "on the store and node type: " << And.getNode()->getOpcode() << std::endl;
         // Extend the value we want to store to the size of the Loaded value to be able to combine
         // the values afterwards
+        /*std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *Info = getInfoforSDValue(Src.getNode()->getNodeId());
+  if (Info != nullptr) {
+    uint64_t Offset = std::get<2>(*Info);
+    Src = DAG.getNode(ISD::SUB, getCurSDLoc(), Src.getValueType(), Src, DAG.getConstant(Offset - Offset/8, getCurSDLoc(), Src.getValueType()));
+  }*/
         SDValue Zext = DAG.getNode(ISD::ZERO_EXTEND, dl, EVT::getEVT(loadType), Src, Flags);
   //std::cout << "on the store zext node type: " << Zext.getNode()->getOpcode() << std::endl;
         //SDValue Shl = Zext;

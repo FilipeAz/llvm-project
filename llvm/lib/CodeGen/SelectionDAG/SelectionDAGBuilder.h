@@ -94,7 +94,8 @@ class SelectionDAGBuilder {
   const Instruction *CurInst = nullptr;
 
   /// ExplicitlyPackedStructMap - The bit fields struct being visited by SDValue
-  DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
+  //DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
+  DenseMap<SDValue, std::pair<uint64_t, uint64_t>> ExplicitlyPackedStructMap;
   /// Used to tell apart gep nodes that are identical because of bitfields stored
   /// in the same word
   int NodeUniqueID = 0;
@@ -700,26 +701,28 @@ public:
   }
 
   /// Return the information for the specified SDValue if it exists.
-  std::tuple<SDValue, uint64_t, uint64_t, uint32_t> *getInfoforSDValue(int ID) {
-    if (ExplicitlyPackedStructMap.find(ID) == ExplicitlyPackedStructMap.end())
+  std::pair<uint64_t, uint64_t> *getInfoforSDValue(SDValue V) {
+    if (ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end())
       return nullptr;
-    return &ExplicitlyPackedStructMap[ID];
+    return &ExplicitlyPackedStructMap[V];
   }
 
-  void setSDValueInfo(int ID, SDValue V, uint64_t BitFieldSize, uint64_t Offset, uint32_t OldID) {
+  void setSDValueInfo(SDValue V, uint64_t BitFieldSize, uint64_t Offset) {
     //assert((ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end()) && "Already set info for this node!");
-    ExplicitlyPackedStructMap.try_emplace(ID, std::make_tuple(V, BitFieldSize, Offset, OldID));
+    ExplicitlyPackedStructMap.try_emplace(V, std::make_pair(BitFieldSize, Offset));
   }
 
-  void eraseSDValueFromMap(int ID) {
-    ExplicitlyPackedStructMap.erase(ID);
+  void eraseSDValueFromMap(SDValue V) {
+    ExplicitlyPackedStructMap.erase(V);
   }
 
   void eraseSDValue() {
-    DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>>::iterator i = ExplicitlyPackedStructMap.begin(), 
-                                                                               e = ExplicitlyPackedStructMap.end();
+    DenseMap<SDValue, std::pair<uint64_t, uint64_t>>::iterator i = ExplicitlyPackedStructMap.begin(), 
+                                                               e = ExplicitlyPackedStructMap.end();
     for(;i != e; i++) {
-      std::get<0>(i->second).getNode()->setNodeId(std::get<3>(i->second));
+      //std::get<0>(i->second).getNode()->setNodeId(std::get<3>(i->second));
+      //i->first.setValueID(-1);
+      //i->first = DAG.getNode(ISD::SUB, getCurSDLoc(), i->first.getValueType(), Ptr, DAG.getConstant(Offset - Offset/8, getCurSDLoc(), Ptr.getValueType()), Flags);
       ExplicitlyPackedStructMap.erase(i);
     }
   }

@@ -2416,16 +2416,20 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
     uint64_t PadSize = 0;
     // Check if padding is needed and insert one or more 0s.
     uint64_t FieldSize = DL.getTypeAllocSize(Field->getType());
-    // If we have a BitFields Struct we may need to do some additional math.
+    // If we have an Explicitly Packed Struct we may need to do some additional math.
     if (Layout->isExplicitlyPacked()) {
       if (Field->getType()->isIntegerTy()) {
         FieldSize = Field->getType()->getPrimitiveSizeInBits();
 
         // If we are still gathering bitfields do the math here.
         if ((WordSize == 0 && FieldSize % 8 != 0) || WordSize % 8 != 0) {
-          WordSize += FieldSize;
+          /*WordSize += FieldSize;
           ORedValues = ORedValues << FieldSize;
-          ORedValues |= Field->getUniqueInteger().getLimitedValue();
+          ORedValues |= Field->getUniqueInteger().getLimitedValue();*/
+          int FieldValue = Field->getUniqueInteger().getLimitedValue();
+          FieldValue = FieldValue << WordSize;
+          ORedValues = FieldValue | ORedValues;
+          WordSize += FieldSize;
           continue;
         }
       } else {

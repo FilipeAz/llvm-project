@@ -818,6 +818,14 @@ void ModuleBitcodeWriter::writeTypeTable() {
   Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, NumBits));
   unsigned StructAnonAbbrev = Stream.EmitAbbrev(std::move(Abbv));
 
+  // Abbrev for TYPE_CODE_EXPLICITLY_PACKED_STRUCT_ANON.
+  Abbv = std::make_shared<BitCodeAbbrev>();
+  Abbv->Add(BitCodeAbbrevOp(bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_ANON));
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1));  // ispacked
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Array));
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, NumBits));
+  unsigned StructExplicitlyAnonAbbrev = Stream.EmitAbbrev(std::move(Abbv));
+  
   // Abbrev for TYPE_CODE_STRUCT_NAME.
   Abbv = std::make_shared<BitCodeAbbrev>();
   Abbv->Add(BitCodeAbbrevOp(bitc::TYPE_CODE_STRUCT_NAME));
@@ -832,6 +840,14 @@ void ModuleBitcodeWriter::writeTypeTable() {
   Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Array));
   Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, NumBits));
   unsigned StructNamedAbbrev = Stream.EmitAbbrev(std::move(Abbv));
+
+  // Abbrev for TYPE_CODE_EXPLICITLY_PACKED_STRUCT_NAMED.
+  Abbv = std::make_shared<BitCodeAbbrev>();
+  Abbv->Add(BitCodeAbbrevOp(bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_NAMED));
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, 1));  // ispacked
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Array));
+  Abbv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Fixed, NumBits));
+  unsigned StructExplicitlyNamedAbbrev = Stream.EmitAbbrev(std::move(Abbv));
 
   // Abbrev for TYPE_CODE_ARRAY.
   Abbv = std::make_shared<BitCodeAbbrev>();
@@ -901,13 +917,13 @@ void ModuleBitcodeWriter::writeTypeTable() {
 
         if (ST->isLiteral()) {
           Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_ANON;
-          AbbrevToUse = StructAnonAbbrev;
+          AbbrevToUse = StructExplicitlyAnonAbbrev;
         } else {
           if (ST->isOpaque()) {
             Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_OPAQUE;
           } else {
             Code = bitc::TYPE_CODE_EXPLICITLY_PACKED_STRUCT_NAMED;
-            AbbrevToUse = StructNamedAbbrev;
+            AbbrevToUse = StructExplicitlyNamedAbbrev;
           }
 
           // Emit the name if it is present.
