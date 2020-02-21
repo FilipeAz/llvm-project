@@ -51,7 +51,7 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 
   unsigned bitsUsed = 0;
   bool noOldFields = false;
-
+  //unsigned currentSize = 0;
   if (IsExplicitlyPacked) {
     NumElements = ST->getOldNumElements();
     // If the structure has bit fields and the oldNumElements array is empty then
@@ -81,14 +81,36 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
     if (!noOldFields)
       StructAlignment = std::max(TyAlign, StructAlignment);
 
-    if (!IsExplicitlyPacked)
-      MemberOffsets[i] = StructSize;
+    if (!IsExplicitlyPacked) {
+      MemberOffsets[i] = std::make_pair(StructSize, 0);
+    }
     else if (IsExplicitlyPacked && noOldFields) {
-      MemberOffsets[i] = bitsUsed;
       if (Ty->isIntegerTy()) {
+        if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 16) {
+          MemberOffsets[i] = std::make_pair(bitsUsed % 8, bitsUsed / 8);
+        } else if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 32) {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          int offset = (endByte >= 4 ? endByte - 4 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 32*/bitsUsed - offset*8, /*(bitsUsed / 32) * 4*/offset);
+        } else if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 64) {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          int offset = (endByte >= 8 ? endByte - 8 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 64*/bitsUsed - offset*8, /*(bitsUsed / 64) * 8*/ offset);
+        } else {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          int offset = (endByte >= 16 ? endByte - 16 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 64*/bitsUsed - offset*8, /*(bitsUsed / 64) * 8*/ offset);
+        }
         bitsUsed += Ty->getPrimitiveSizeInBits();
       }
       else {
+        MemberOffsets[i] = std::make_pair(0, bitsUsed/8);
         bitsUsed += DL.getTypeAllocSize(Ty) * 8;
       }
     }
@@ -120,13 +142,45 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
   } else if (IsExplicitlyPacked) {
     NumElements = ST->getNumElements();
     unsigned bitsUsed = 0;
+    //unsigned currentSize = 0;
+    unsigned offset = 0;
+    //unsigned OldElementIndex = 0;
     for (unsigned i = 0, e = NumElements; i != e; ++i) {
       Type *Ty = ST->getElementType(i);
-      MemberOffsets[i] = bitsUsed;
-      if (Ty->isIntegerTy()) 
+      if (Ty->isIntegerTy()) {
+        if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 16) {
+          MemberOffsets[i] = std::make_pair(bitsUsed % 8, bitsUsed / 8);
+          //std::cout << "bitsUsed: " << bitsUsed << "\n"; 
+          //MemberOffsets[i*2+1] = bitsUsed / 8;
+        } else if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 32) {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          offset = (endByte >= 4 ? endByte - 4 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 32*/bitsUsed - offset*8, /*(bitsUsed / 32) * 4*/offset);
+          //MemberOffsets[i*2+1] = (bitsUsed / 32) * 4;
+        } else if (Ty->getPrimitiveSizeInBits() + bitsUsed % 8 <= 64) {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          offset = (endByte >= 8 ? endByte - 8 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 64*/bitsUsed - offset*8, /*(bitsUsed / 64) * 8*/ offset);
+          //MemberOffsets[i*2+1] = (bitsUsed / 64) * 8;
+        } else {
+          int endByte = (Ty->getPrimitiveSizeInBits() + bitsUsed)/8 + 1;
+          if ((Ty->getPrimitiveSizeInBits() + bitsUsed) % 8 == 0)
+            endByte--;
+          offset = (endByte >= 16 ? endByte - 16 : 0);
+          MemberOffsets[i] = std::make_pair(/*bitsUsed % 64*/bitsUsed - offset*8, /*(bitsUsed / 64) * 8*/ offset);
+        }
         bitsUsed += Ty->getPrimitiveSizeInBits();
-      else
+        //offsetOnWord += Ty->getPrimitiveSizeInBits();
+      }
+      else  {
+        MemberOffsets[i] = std::make_pair(0, bitsUsed/8);
         bitsUsed += DL.getTypeAllocSize(Ty) * 8;
+        //offsetOnWord += DL.getTypeAllocSize(Ty) * 8;
+      }
     }
   }
 }
@@ -134,13 +188,20 @@ StructLayout::StructLayout(StructType *ST, const DataLayout &DL) {
 /// getElementContainingOffset - Given a valid offset into the structure,
 /// return the structure index that contains it.
 unsigned StructLayout::getElementContainingOffset(uint64_t Offset) const {
+  uint64_t *ByteOffsets = new uint64_t[NumElements];
+  for (unsigned i = 0; i < NumElements; i ++) {
+    if (IsExplicitlyPacked)
+      ByteOffsets[i] = MemberOffsets[i].second * 8 + MemberOffsets[i].first;
+    else
+      ByteOffsets[i] = MemberOffsets[i].first;
+  }
   const uint64_t *SI =
-    std::upper_bound(&MemberOffsets[0], &MemberOffsets[NumElements], Offset);
-  assert(SI != &MemberOffsets[0] && "Offset not in structure type!");
+    std::upper_bound(&ByteOffsets[0], &ByteOffsets[NumElements], Offset);
+  assert(SI != &ByteOffsets[0] && "Offset not in structure type!");
   --SI;
   assert(*SI <= Offset && "upper_bound didn't work");
-  assert((SI == &MemberOffsets[0] || *(SI-1) <= Offset) &&
-         (SI+1 == &MemberOffsets[NumElements] || *(SI+1) > Offset) &&
+  assert((SI == &ByteOffsets[0] || *(SI-1) <= Offset) &&
+         (SI+1 == &ByteOffsets[NumElements] || *(SI+1) > Offset) &&
          "Upper bound didn't work!");
 
   // Multiple fields can have the same offset if any of them are zero sized.
@@ -148,7 +209,7 @@ unsigned StructLayout::getElementContainingOffset(uint64_t Offset) const {
   // at the i32 element, because it is the last element at that offset.  This is
   // the right one to return, because anything after it will have a higher
   // offset, implying that this element is non-empty.
-  return SI-&MemberOffsets[0];
+  return SI-&ByteOffsets[0];
 }
 
 //===----------------------------------------------------------------------===//
@@ -612,6 +673,7 @@ public:
   ~StructLayoutMap() {
     // Remove any layouts.
     for (const auto &I : LayoutInfo) {
+      //std::cout << "in dest\n";
       StructLayout *Value = I.second;
       Value->~StructLayout();
       free(Value);
@@ -649,7 +711,7 @@ const StructLayout *DataLayout::getStructLayout(StructType *Ty) const {
   // malloc it, then use placement new.
   int NumElts = Ty->getNumElements();
   StructLayout *L = (StructLayout *)
-      safe_malloc(sizeof(StructLayout)+(NumElts-1) * sizeof(uint64_t));
+      safe_malloc(sizeof(StructLayout)+(/*NumElts == 0 ? 0 : */NumElts-1) * sizeof(std::pair<uint32_t,uint32_t>));
 
   // Set SL before calling StructLayout's ctor.  The ctor could cause other
   // entries to be added to TheMap, invalidating our reference.

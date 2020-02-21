@@ -531,7 +531,7 @@ class StructLayout {
   unsigned IsPadded : 1;
   unsigned IsExplicitlyPacked : 1;
   unsigned NumElements : 30;
-  uint64_t MemberOffsets[1]; // variable sized array!
+  std::pair<uint32_t, uint32_t> MemberOffsets[1]; // variable sized array!
 
 public:
   uint64_t getSizeInBytes() const { return StructSize; }
@@ -552,13 +552,22 @@ public:
   /// index that contains it.
   unsigned getElementContainingOffset(uint64_t Offset) const;
 
-  uint64_t getElementOffset(unsigned Idx) const {
+  uint32_t getElementOffset(unsigned Idx) const {
     assert(Idx < NumElements && "Invalid element idx!");
-    return MemberOffsets[Idx];
+    return MemberOffsets[Idx].first;
   }
 
-  uint64_t getElementOffsetInBits(unsigned Idx) const {
+  uint32_t getElementOffsetInBits(unsigned Idx) const {
     return getElementOffset(Idx) * 8;
+  }
+
+  uint32_t getGEPElementOffset(unsigned Idx) const {
+    assert(Idx < NumElements && "Invalid element idx!");
+    return MemberOffsets[Idx].second;
+  }
+
+  uint32_t getGEPElementOffsetInBits(unsigned Idx) const {
+    return getGEPElementOffset(Idx) * 8;
   }
 
 private:

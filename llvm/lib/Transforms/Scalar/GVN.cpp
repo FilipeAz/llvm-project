@@ -1983,6 +1983,30 @@ bool GVN::runImpl(Function &F, AssumptionCache &RunAC, DominatorTree &RunDT,
                   const TargetLibraryInfo &RunTLI, AAResults &RunAA,
                   MemoryDependenceResults *RunMD, LoopInfo *LI,
                   OptimizationRemarkEmitter *RunORE) {
+  
+  for (Function::iterator FI = F.begin(), FE = F.end(); FI != FE; ) {
+    BasicBlock *BB = &*FI++;
+    for (Instruction &I : *BB) {
+      if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(LI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(SI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(&I)) {
+        if (StructType *STy = dyn_cast<StructType>(GEPI->getSourceElementType())) {
+          if (STy->isExplicitlyPacked())
+            return false;
+        }
+      }
+    }
+  }
   AC = &RunAC;
   DT = &RunDT;
   VN.setDomTree(DT);

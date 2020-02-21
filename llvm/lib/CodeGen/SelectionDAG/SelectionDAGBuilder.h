@@ -95,7 +95,7 @@ class SelectionDAGBuilder {
 
   /// ExplicitlyPackedStructMap - The bit fields struct being visited by SDValue
   //DenseMap<int, std::tuple<SDValue, uint64_t, uint64_t, uint32_t>> ExplicitlyPackedStructMap;
-  DenseMap<SDValue, std::pair<uint64_t, uint64_t>> ExplicitlyPackedStructMap;
+  DenseMap<const Value*, std::pair<uint64_t, uint32_t>> ExplicitlyPackedStructMap;
   /// Used to tell apart gep nodes that are identical because of bitfields stored
   /// in the same word
   int NodeUniqueID = 0;
@@ -701,24 +701,24 @@ public:
   }
 
   /// Return the information for the specified SDValue if it exists.
-  std::pair<uint64_t, uint64_t> *getInfoforSDValue(SDValue V) {
+  std::pair<uint64_t, uint32_t> *getInfoforSDValue(const Value *V) {
     if (ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end())
       return nullptr;
     return &ExplicitlyPackedStructMap[V];
   }
 
-  void setSDValueInfo(SDValue V, uint64_t BitFieldSize, uint64_t Offset) {
+  void setSDValueInfo(const Value *V, uint64_t BitFieldSize, uint32_t Offset) {
     //assert((ExplicitlyPackedStructMap.find(V) == ExplicitlyPackedStructMap.end()) && "Already set info for this node!");
     ExplicitlyPackedStructMap.try_emplace(V, std::make_pair(BitFieldSize, Offset));
   }
 
-  void eraseSDValueFromMap(SDValue V) {
+  void eraseSDValueFromMap(const Value *V) {
     ExplicitlyPackedStructMap.erase(V);
   }
 
   void eraseSDValue() {
-    DenseMap<SDValue, std::pair<uint64_t, uint64_t>>::iterator i = ExplicitlyPackedStructMap.begin(), 
-                                                               e = ExplicitlyPackedStructMap.end();
+    DenseMap<const Value*, std::pair<uint64_t, uint32_t>>::iterator i = ExplicitlyPackedStructMap.begin(), 
+                                                                    e = ExplicitlyPackedStructMap.end();
     for(;i != e; i++) {
       //std::get<0>(i->second).getNode()->setNodeId(std::get<3>(i->second));
       //i->first.setValueID(-1);

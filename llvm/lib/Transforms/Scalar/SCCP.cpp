@@ -1757,6 +1757,29 @@ static bool runSCCP(Function &F, const DataLayout &DL,
   LLVM_DEBUG(dbgs() << "SCCP on function '" << F.getName() << "'\n");
   SCCPSolver Solver(DL, TLI);
 
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : BB) {
+      if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(LI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(SI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(&I)) {
+        if (StructType *STy = dyn_cast<StructType>(GEPI->getSourceElementType())) {
+          if (STy->isExplicitlyPacked())
+            return false;
+        }
+      }
+    }
+  }
+
   // Mark the first block of the function as being executable.
   Solver.MarkBlockExecutable(&F.front());
 

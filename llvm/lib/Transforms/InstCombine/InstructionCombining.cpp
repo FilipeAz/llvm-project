@@ -102,7 +102,7 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <iostream>
+
 using namespace llvm;
 using namespace llvm::PatternMatch;
 
@@ -3462,6 +3462,29 @@ static bool combineInstructionsOverFunction(
   bool MadeIRChange = false;
   if (ShouldLowerDbgDeclare)
     MadeIRChange = LowerDbgDeclare(F);
+
+  for (BasicBlock &BB : F) {
+    for (Instruction &I : BB) {
+      if (LoadInst *LI = dyn_cast<LoadInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(LI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+        if (GEPOperator *GEPO = dyn_cast<GEPOperator>(SI->getPointerOperand())) {
+          if (StructType *STy = dyn_cast<StructType>(GEPO->getSourceElementType()))
+            if (STy->isExplicitlyPacked())
+              return false;
+        }
+      } else if (GetElementPtrInst *GEPI = dyn_cast<GetElementPtrInst>(&I)) {
+        if (StructType *STy = dyn_cast<StructType>(GEPI->getSourceElementType())) {
+          if (STy->isExplicitlyPacked())
+            return false;
+        }
+      }
+    }
+  }
 
   // Iterate while there is work to do.
   int Iteration = 0;

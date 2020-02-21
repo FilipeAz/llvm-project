@@ -261,7 +261,8 @@ void PassManagerBuilder::populateFunctionPassManager(
   addInitialAliasAnalysisPasses(FPM);
 
   FPM.add(createCFGSimplificationPass());
-  FPM.add(createSROAPass());
+  //FPM.add(createSROAPass());
+  FPM.add(createPromoteMemoryToRegisterPass());
   FPM.add(createEarlyCSEPass());
   FPM.add(createLowerExpectIntrinsicPass());
 }
@@ -285,7 +286,8 @@ void PassManagerBuilder::addPGOInstrPasses(legacy::PassManagerBase &MPM) {
     IP.HintThreshold = 325;
 
     MPM.add(createFunctionInliningPass(IP));
-    MPM.add(createSROAPass());
+    //MPM.add(createSROAPass());
+    MPM.add(createPromoteMemoryToRegisterPass());
     MPM.add(createEarlyCSEPass());             // Catch trivial redundancies
     MPM.add(createCFGSimplificationPass());    // Merge & remove BBs
     MPM.add(createInstructionCombiningPass()); // Combine silly seq's
@@ -314,7 +316,8 @@ void PassManagerBuilder::addFunctionSimplificationPasses(
     legacy::PassManagerBase &MPM) {
   // Start of function pass.
   // Break up aggregate allocas, using SSAUpdater.
-  MPM.add(createSROAPass());
+  //MPM.add(createSROAPass());
+  MPM.add(createPromoteMemoryToRegisterPass());
   MPM.add(createEarlyCSEPass(EnableEarlyCSEMemSSA)); // Catch trivial redundancies
   if (EnableGVNHoist)
     MPM.add(createGVNHoistPass());
@@ -862,7 +865,8 @@ void PassManagerBuilder::addLTOOptimizationPasses(legacy::PassManagerBase &PM) {
   PM.add(createJumpThreadingPass());
 
   // Break up allocas
-  PM.add(createSROAPass());
+  //PM.add(createSROAPass());
+  PM.add(createPromoteMemoryToRegisterPass());
 
   // Run a few AA driven optimizations here and now, to cleanup the code.
   PM.add(createPostOrderFunctionAttrsLegacyPass()); // Add nocapture.

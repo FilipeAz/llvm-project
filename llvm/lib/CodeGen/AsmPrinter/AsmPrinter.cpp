@@ -2410,10 +2410,9 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
   // ORedValues will be used to store the ored bitfields that can be stored in a single word.
   // WordSize is to keep the size of the word between iterations.
   // FieldOffset tells us the offset of the word we want to store now.
-  uint64_t ORedValues = 0, WordSize = 0, FieldOffset = 0;
+  uint64_t ORedValues = 0, WordSize = 0/*, FieldOffset = 0*/;
   for (unsigned i = 0, e = CS->getNumOperands(); i != e; ++i) {
     const Constant *Field = CS->getOperand(i);
-    uint64_t PadSize = 0;
     // Check if padding is needed and insert one or more 0s.
     uint64_t FieldSize = DL.getTypeAllocSize(Field->getType());
     // If we have an Explicitly Packed Struct we may need to do some additional math.
@@ -2425,8 +2424,28 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
         if ((WordSize == 0 && FieldSize % 8 != 0) || WordSize % 8 != 0) {
           /*WordSize += FieldSize;
           ORedValues = ORedValues << FieldSize;
+          /*uint64_t finalResult = Field->getUniqueInteger().getLimitedValue() & 1;
+          for (uint64_t i = 1; i < FieldSize; i++) {
+            int bit = (Field->getUniqueInteger().getLimitedValue() >> i) & 1;
+            finalResult = finalResult << 1;
+            finalResult |= bit;
+          }
+          std::cout << "finalresult should be: " << finalResult << "\n";
           ORedValues |= Field->getUniqueInteger().getLimitedValue();*/
-          int FieldValue = Field->getUniqueInteger().getLimitedValue();
+          uint64_t FieldValue = Field->getUniqueInteger().getLimitedValue();
+          if (WordSize + FieldSize > 64) {
+            uint64_t x = FieldValue << WordSize;
+            ORedValues = x | ORedValues;
+            llvm::APInt Val = llvm::APInt(64, ORedValues);
+            const Constant *OldField = llvm::Constant::getIntegerValue(llvm::Type::getIntNTy(CS->getContext(), 64), Val);
+
+            // Print the bitfields that we have been gathering in one single word.
+            emitGlobalConstantImpl(DL, OldField, AP, BaseCV, Offset + SizeSoFar);
+            SizeSoFar += 8;
+            WordSize = WordSize + FieldSize - 64;
+            ORedValues = FieldValue >> (FieldSize - WordSize);
+            continue;
+          }
           FieldValue = FieldValue << WordSize;
           ORedValues = FieldValue | ORedValues;
           WordSize += FieldSize;
@@ -2444,14 +2463,14 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
         // Print the bitfields that we have been gathering in one single word.
         emitGlobalConstantImpl(DL, OldField, AP, BaseCV, Offset + SizeSoFar);
 
-        PadSize = Layout->getElementOffset(i)/8 - FieldOffset - WordSize/8;
-        SizeSoFar += WordSize/8 + PadSize;
-        FieldOffset = SizeSoFar;
+        /*PadSize = (Layout->getElementOffset(i) + Layout->getGEPElementOffset(i)*8)/8 - FieldOffset - WordSize/8;*/
+        SizeSoFar += WordSize/8/* + PadSize*/;
+        //FieldOffset = SizeSoFar;
         // Start a new bitfield if that is the case.
         if (FieldSize % 8 != 0) {
           WordSize = Field->getType()->getPrimitiveSizeInBits();
           ORedValues = Field->getUniqueInteger().getLimitedValue();
-          AP.OutStreamer->EmitZeros(PadSize);
+          //AP.OutStreamer->EmitZeros(PadSize);
           continue;
         }
       }
@@ -2464,20 +2483,22 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
     // Print the actual field value.
     emitGlobalConstantImpl(DL, Field, AP, BaseCV, Offset + SizeSoFar);
 
-    if (Layout->isExplicitlyPacked())
-      PadSize = ((i == e-1 ? Size : Layout->getElementOffset(i+1)/8)
-                        - Layout->getElementOffset(i)/8) - FieldSize;
-    else
+    /*if (Layout->isExplicitlyPacked())
+      PadSize = ((i == e-1 ? Size : (Layout->getElementOffset(i+1) + Layout->getGEPElementOffset(i+1)*8)/8)
+                        - (Layout->getElementOffset(i) + Layout->getGEPElementOffset(i)*8)/8) - FieldSize;*/
+    uint64_t PadSize = 0;
+    if (!Layout->isExplicitlyPacked())
       PadSize = ((i == e-1 ? Size : Layout->getElementOffset(i+1))
                         - Layout->getElementOffset(i)) - FieldSize;
 
     SizeSoFar += FieldSize + PadSize;
-    FieldOffset = SizeSoFar;
+    //FieldOffset = SizeSoFar;
 
     // Insert padding - this may include padding to increase the size of the
     // current field up to the ABI size (if the struct is not packed) as well
     // as padding to ensure that the next field starts at the right offset.
-    AP.OutStreamer->EmitZeros(PadSize);
+    if (!Layout->isExplicitlyPacked())
+      AP.OutStreamer->EmitZeros(PadSize);
   }
 
   // Emit the final word in case it has bit fields in it
@@ -2487,8 +2508,9 @@ static void emitGlobalConstantStruct(const DataLayout &DL,
     
     // Print the bitfields that we have been gathering in one single word.
     emitGlobalConstantImpl(DL, OldField, AP, BaseCV, Offset + SizeSoFar);
-    AP.OutStreamer->EmitZeros(Size - FieldOffset - WordSize/8);
-    SizeSoFar += WordSize/8 + Size - FieldOffset - WordSize/8;
+    //AP.OutStreamer->EmitZeros(Size - FieldOffset - WordSize/8);
+    //SizeSoFar += WordSize/8 + Size - FieldOffset - WordSize/8;
+    SizeSoFar += WordSize/8;
   }
 
   assert(SizeSoFar == Layout->getSizeInBytes() &&
