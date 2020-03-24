@@ -104,10 +104,10 @@ AppendField(const FieldDecl *Field, uint64_t FieldOffset,
 
   if (ExplicitlyPacked) {
     // If padding is needed.
-    if (PreviousFieldEnd != FieldOffset) {
+    /*if (PreviousFieldEnd != FieldOffset) {
       Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                               llvm::APInt(FieldOffset - PreviousFieldEnd, 0)));
-    }
+    }*/
 
     PreviousFieldEnd = FieldOffset;
     NextFieldOffsetInChars = CharUnits::fromQuantity(PreviousFieldEnd/8);
@@ -189,10 +189,10 @@ void ConstStructBuilder::AppendBitField(const FieldDecl *Field,
     llvm::APInt FieldValue = CI->getValue();
     uint64_t FieldSize = Field->getBitWidthValue(Context);
 
-    if (PreviousFieldEnd != FieldOffset) {
+    /*if (PreviousFieldEnd != FieldOffset) {
       Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
                                               llvm::APInt(FieldOffset - PreviousFieldEnd, 0)));
-    }
+    }*/
 
     PreviousFieldEnd = FieldOffset + FieldSize;
 
@@ -449,6 +449,8 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
   unsigned FieldNo = 0;
   unsigned ElementNo = 0;
 
+  unsigned ElementIndex = 0;
+
   // Bail out if we have base classes. We could support these, but they only
   // arise in C++1z where we will have already constant folded most interesting
   // cases. FIXME: There are still a few more cases we can handle this way.
@@ -478,6 +480,26 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
     if (!EltInit)
       return false;
 
+    if (ExplicitlyPacked) {
+      llvm::Type *ValTy = CGM.getTypes().ConvertType(Ty);
+      llvm::StructType *ValSTy = dyn_cast<llvm::StructType>(ValTy);
+      while (PreviousFieldEnd < Layout.getFieldOffset(FieldNo)) {
+        if (ValSTy->getElementType(ElementIndex)->isIntegerTy()) {
+          Elements.push_back(llvm::ConstantInt::get(CGM.getLLVMContext(),
+                                                  llvm::APInt(ValSTy->getElementType(ElementIndex)->getPrimitiveSizeInBits(), 0)));
+
+          PreviousFieldEnd += ValSTy->getElementType(ElementIndex)->getPrimitiveSizeInBits();
+        }
+        if (ValSTy->getElementType(ElementIndex)->isArrayTy()) {
+          Elements.push_back(llvm::UndefValue::get(llvm::ArrayType::get(ValSTy->getElementType(ElementIndex)->getArrayElementType(), 
+                                                                        ValSTy->getElementType(ElementIndex)->getArrayNumElements())));
+
+          PreviousFieldEnd += ValSTy->getElementType(ElementIndex)->getArrayElementType()->getPrimitiveSizeInBits() * ValSTy->getElementType(ElementIndex)->getArrayNumElements();
+        }
+        ElementIndex++;
+      }
+    }
+
     if (!Field->isBitField()) {
       // Handle non-bitfield members.
       AppendField(*Field, Layout.getFieldOffset(FieldNo), EltInit);
@@ -491,6 +513,7 @@ bool ConstStructBuilder::Build(InitListExpr *ILE, QualType Ty) {
         return false;
       }
     }
+    ElementIndex++;
   }
 
   // If the last field was a bitfield we may need to add a final padding.
