@@ -907,7 +907,7 @@ redo_gep:
     break;
   }
 
-  case Instruction::GetElementPtr: {
+  case Instruction::GetElementPtr: {return false;
     X86AddressMode SavedAM = AM;
 
     // Pattern-match simple GEPs.

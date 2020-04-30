@@ -1753,7 +1753,7 @@ static bool tryToReplaceWithConstant(SCCPSolver &Solver, Value *V) {
 // runSCCP() - Run the Sparse Conditional Constant Propagation algorithm,
 // and return true if the function was modified.
 static bool runSCCP(Function &F, const DataLayout &DL,
-                    const TargetLibraryInfo *TLI) {
+                    const TargetLibraryInfo *TLI) {return false;
   LLVM_DEBUG(dbgs() << "SCCP on function '" << F.getName() << "'\n");
   SCCPSolver Solver(DL, TLI);
 

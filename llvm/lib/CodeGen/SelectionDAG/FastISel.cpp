@@ -672,7 +672,7 @@ bool FastISel::selectBinaryOp(const User *I, unsigned ISDOpcode) {
   return true;
 }
 
-bool FastISel::selectGetElementPtr(const User *I) {
+bool FastISel::selectGetElementPtr(const User *I) {return false;
   unsigned N = getRegForValue(I->getOperand(0));
 
   if (!N) // Unhandled operand. Halt "fast" selection and bail.
